@@ -44,6 +44,16 @@ export default function App() {
         }),
       grade: (id, g) =>
         setState((s) => ({ ...s, cards: { ...s.cards, [id]: gradeCard(s.cards[id], g) } })),
+      markGap: (id, ok) =>
+        setState((s) => {
+          const m = { ...(s.gapMistakes || {}) }
+          if (ok) delete m[id]
+          else m[id] = true
+          return { ...s, gapMistakes: m }
+        }),
+      count: (key, n = 1) =>
+        setState((s) => ({ ...s, stats: { ...s.stats, [key]: (s.stats?.[key] || 0) + n } })),
+      replace: (next) => setState(next),
       reset: () => setState(resetState()),
       go: (t, r = null) => {
         setTab(t)

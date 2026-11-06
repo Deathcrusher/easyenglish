@@ -8,7 +8,11 @@ const DEFAULTS = {
   cards: {}, // id -> { box, due }
   days: {}, // 'YYYY-MM-DD' -> xp
   tenseDone: {}, // tenseId -> best score
+  gapMistakes: {}, // Index der falsch beantworteten Lückentexte
+  stats: {}, // Zähler für Erfolge (sentences, spoken, dictation, lessons, written)
 }
+
+export const STATE_KEYS = Object.keys(DEFAULTS)
 
 export function loadState() {
   try {

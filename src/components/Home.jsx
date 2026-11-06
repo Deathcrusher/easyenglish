@@ -5,17 +5,17 @@ import { TENSES } from '../data/grammar.js'
 import { PHRASES } from '../data/speaking.js'
 import { dayKey, addDays, isDue, streakOf, LEARNED_BOX } from '../lib/storage.js'
 import { speak } from '../lib/speech.js'
+import { achievements } from '../data/achievements.js'
+import Lesson, { dayIndex } from './Lesson.jsx'
 
 const DAY_NAMES = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa']
 
-function dayIndex() {
-  const d = new Date()
-  return Math.floor((d - new Date(d.getFullYear(), 0, 0)) / 86400000)
-}
-
 export default function Home() {
-  const { state, go, update, reset } = useApp()
+  const { state, go, update, reset, replace, route } = useApp()
   const [settings, setSettings] = useState(false)
+  const [showAll, setShowAll] = useState(false)
+  if (route?.lesson) return <Lesson />
+  const lessonsToday = state.lessonDay === dayKey()
   const today = dayKey()
   const xp = state.days[today] || 0
   const goal = state.goal
@@ -48,7 +48,7 @@ export default function Home() {
         <button className="icon-btn" onClick={() => setSettings(!settings)} aria-label="Einstellungen">⚙️</button>
       </header>
 
-      {settings && <Settings state={state} update={update} reset={reset} close={() => setSettings(false)} />}
+      {settings && <Settings state={state} update={update} reset={reset} replace={replace} close={() => setSettings(false)} />}
 
       <section className="card goal-card">
         <svg viewBox="0 0 120 120" className="ring">
@@ -85,12 +85,20 @@ export default function Home() {
         </div>
       </section>
 
-      <h2 className="section-title">Deine Mini-Lektion für heute</h2>
+      <button className={`hero-card lesson-cta ${lessonsToday ? 'done' : ''}`} onClick={() => go('home', { lesson: true })}>
+        <div>
+          <strong>{lessonsToday ? '✅ Lektion nochmal machen' : '▶ Heutige Lektion starten'}</strong>
+          <span>Vokabeln, {tense.en}, Sätze & Sprechen – ca. 10 Min.</span>
+        </div>
+        <span className="arrow">→</span>
+      </button>
+
+      <h2 className="section-title">Oder einzeln üben</h2>
       <div className="todo">
         <button className="todo-item" onClick={() => go('vocab', { mode: 'cards', topic: 'all' })}>
           <span className="todo-icon">📚</span>
           <span className="todo-text">
-            <strong>{due > 0 ? `${due} Vokabeln wiederholen` : 'Neue Vokabeln lernen'}</strong>
+            <strong>{due > 0 ? `${due} ${due === 1 ? "Vokabel" : "Vokabeln"} wiederholen` : 'Neue Vokabeln lernen'}</strong>
             <small>{learned} Wörter sitzen · {seen} von {ALL_WORDS.length} gesehen</small>
           </span>
           <span className="arrow">→</span>
@@ -123,13 +131,67 @@ export default function Home() {
         </div>
       </section>
 
+      <Achievements state={state} showAll={showAll} setShowAll={setShowAll} />
+
       <p className="note center">So gibt's XP: Vokabel gewusst +3 · Quiz richtig +2 · Satz gebaut +3 · gut nachgesprochen +3</p>
     </div>
   )
 }
 
-function Settings({ state, update, reset, close }) {
+function Achievements({ state, showAll, setShowAll }) {
+  const list = achievements(state)
+  const done = list.filter((a) => a.done).length
+  const shown = showAll ? list : [...list.filter((a) => a.done), ...list.filter((a) => !a.done)].slice(0, 6)
+  return (
+    <>
+      <h2 className="section-title">Erfolge · {done}/{list.length}</h2>
+      <div className="badges">
+        {shown.map((a) => (
+          <div key={a.id} className={`badge-card ${a.done ? 'got' : ''}`}>
+            <span className="b-icon">{a.icon}</span>
+            <strong>{a.title}</strong>
+            <small>{a.desc}</small>
+            {!a.done && (
+              <div className="b-bar"><div style={{ width: `${Math.min(100, (a.v / a.max) * 100)}%` }} /></div>
+            )}
+          </div>
+        ))}
+      </div>
+      <button className="link skip" onClick={() => setShowAll(!showAll)}>{showAll ? 'Weniger anzeigen' : 'Alle Erfolge anzeigen'}</button>
+    </>
+  )
+}
+
+function Settings({ state, update, reset, replace, close }) {
   const [confirm, setConfirm] = useState(false)
+  const [msg, setMsg] = useState('')
+
+  function exportData() {
+    const blob = new Blob([JSON.stringify({ app: 'easy-english', v: 1, state }, null, 1)], { type: 'application/json' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `easy-english-backup-${dayKey()}.json`
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+    setMsg('✅ Backup-Datei heruntergeladen.')
+  }
+
+  function importData(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    file.text().then((txt) => {
+      try {
+        const data = JSON.parse(txt)
+        if (data.app !== 'easy-english' || !data.state?.cards) throw new Error('bad')
+        replace({ ...state, ...data.state })
+        setMsg('✅ Fortschritt wiederhergestellt!')
+      } catch {
+        setMsg('⚠️ Das ist keine gültige Easy-English-Backup-Datei.')
+      }
+    })
+    e.target.value = ''
+  }
+
   return (
     <section className="card settings">
       <h3>Einstellungen</h3>
@@ -165,7 +227,18 @@ function Settings({ state, update, reset, close }) {
           ))}
         </div>
       </div>
-      <p className="note">Dein Fortschritt wird nur auf diesem Gerät gespeichert.</p>
+      <div className="field">
+        <span>Backup</span>
+        <p className="note" style={{ marginTop: 0 }}>Der Fortschritt liegt nur auf diesem Gerät. Mit einem Backup kannst du ihn sichern oder aufs neue Handy mitnehmen.</p>
+        <div className="btn-row" style={{ marginTop: 6 }}>
+          <button className="btn ghost" onClick={exportData}>💾 Sichern</button>
+          <label className="btn ghost file-btn">
+            📂 Wiederherstellen
+            <input type="file" accept="application/json,.json" onChange={importData} hidden />
+          </label>
+        </div>
+        {msg && <p className="note">{msg}</p>}
+      </div>
       <div className="btn-row">
         {confirm ? (
           <button className="btn danger" onClick={() => { reset(); setConfirm(false); close() }}>Wirklich alles löschen?</button>

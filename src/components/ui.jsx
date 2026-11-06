@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { speak, canListen, listen, compareSpeech } from '../lib/speech.js'
+import { useApp } from '../App.jsx'
 
 export function Listen({ text, small = false, label }) {
   return (
@@ -24,6 +25,7 @@ const ERRORS = {
 }
 
 export function MicCheck({ target, onScore, compact = false }) {
+  const app = useApp()
   const [state, setState] = useState('idle') // idle | listening | done | error
   const [result, setResult] = useState(null)
   const [err, setErr] = useState('')
@@ -40,6 +42,7 @@ export function MicCheck({ target, onScore, compact = false }) {
       const r = compareSpeech(target, alts)
       setResult(r)
       setState('done')
+      if (r.score >= 0.65) app?.count('spoken')
       onScore?.(r.score)
     } catch (e) {
       setErr(ERRORS[e] || 'Das hat nicht geklappt. Nochmal probieren!')

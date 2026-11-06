@@ -18,6 +18,16 @@ export default function Grammar() {
         <p className="sub">Jede Zeit mit Zeitstrahl, Bauplan, Signalwörtern und Übungen.</p>
       </header>
 
+      {Object.keys(state.gapMistakes || {}).length > 0 && (
+        <button className="hero-card" onClick={() => setRoute({ quiz: 'mistakes' })}>
+          <div>
+            <strong>🎯 Fehler-Training</strong>
+            <span>{Object.keys(state.gapMistakes).length} Fragen, die noch nicht sitzen</span>
+          </div>
+          <span className="arrow">→</span>
+        </button>
+      )}
+
       <button className="hero-card warn" onClick={() => setRoute({ compare: true })}>
         <div>
           <strong>⚠️ Die größte Falle: „Ich habe … gemacht“</strong>
@@ -125,26 +135,48 @@ function TenseDetail({ id }) {
   )
 }
 
-function GapQuiz({ tense }) {
-  const { setRoute, addXp, update, state } = useApp()
+const GAP_IDS = GAPS.map((g, idx) => ({ ...g, id: idx }))
+
+export function GapQuiz({ tense, onFinish, count }) {
+  const { setRoute, addXp, update, state, markGap } = useApp()
+  const plain = tense === 'mix' || tense === 'mistakes'
   const items = useMemo(() => {
-    const pool = tense === 'mix' ? shuffle(GAPS).slice(0, 10) : shuffle(GAPS.filter((g) => g.t === tense)).slice(0, 5)
+    let pool
+    if (tense === 'mix') pool = shuffle(GAP_IDS).slice(0, 10)
+    else if (tense === 'mistakes') pool = shuffle(GAP_IDS.filter((g) => state.gapMistakes?.[g.id])).slice(0, 10)
+    else pool = shuffle(GAP_IDS.filter((g) => g.t === tense)).slice(0, count || 5)
     return pool.map((g) => ({ ...g, o: shuffle(g.o) }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tense])
   const [i, setI] = useState(0)
   const [picked, setPicked] = useState(null)
   const [score, setScore] = useState(0)
   const q = items[i]
-  const back = () => setRoute(tense === 'mix' ? null : { tense })
+  const back = onFinish || (() => setRoute(plain ? null : { tense }))
 
   if (!q) {
+    if (onFinish) {
+      return (
+        <div className="center-box">
+          <div className="big-emoji">✏️</div>
+          <h2>{score} von {items.length} richtig</h2>
+          <button className="btn primary" onClick={onFinish}>Weiter</button>
+        </div>
+      )
+    }
     return (
       <div className="center-box">
         <div className="big-emoji">{score / items.length >= 0.8 ? '🏆' : score / items.length >= 0.5 ? '💪' : '🌱'}</div>
         <h2>{score} von {items.length} richtig</h2>
-        <p>{score === items.length ? 'Fehlerfrei – du hast es drauf!' : 'Schau dir die Erklärung nochmal an und probier es gleich nochmal.'}</p>
-        <button className="btn primary" onClick={() => { setI(0); setScore(0); setPicked(null) }}>Nochmal üben</button>
-        <button className="btn ghost" onClick={back}>{tense === 'mix' ? 'Zurück' : 'Zur Erklärung'}</button>
+        <p>
+          {tense === 'mistakes'
+            ? 'Richtig beantwortete Fragen fliegen aus dem Fehler-Training raus.'
+            : score === items.length ? 'Fehlerfrei – du hast es drauf!' : 'Falsche Antworten landen im Fehler-Training. Probier es gleich nochmal!'}
+        </p>
+        {tense !== 'mistakes' && (
+          <button className="btn primary" onClick={() => { setI(0); setScore(0); setPicked(null) }}>Nochmal üben</button>
+        )}
+        <button className="btn ghost" onClick={back}>{plain ? 'Zurück' : 'Zur Erklärung'}</button>
       </div>
     )
   }
@@ -155,13 +187,14 @@ function GapQuiz({ tense }) {
     if (picked) return
     setPicked(o)
     const ok = o === q.a
+    markGap(q.id, ok)
     if (ok) {
       setScore((s) => s + 1)
       addXp(2)
     }
     speak(full)
     const isLast = i === items.length - 1
-    if (isLast && tense !== 'mix') {
+    if (isLast && !plain && !onFinish) {
       const final = score + (ok ? 1 : 0)
       update({ tenseDone: { ...state.tenseDone, [tense]: Math.max(final, state.tenseDone[tense] || 0) } })
     }
@@ -179,7 +212,7 @@ function GapQuiz({ tense }) {
       </div>
 
       <div className="quiz-q">
-        <p className="quiz-ask">{tense === 'mix' ? 'Welche Form passt?' : t.en}</p>
+        <p className="quiz-ask">{plain ? 'Welche Form passt?' : t.en}</p>
         <p className="gap-sentence">
           {parts[0]}
           <span className={`gap ${picked ? 'ok' : ''}`}>{picked ? q.a : '?'}</span>
@@ -198,7 +231,7 @@ function GapQuiz({ tense }) {
       {picked && (
         <div className={`feedback ${picked === q.a ? 'good' : 'bad'}`}>
           <p><strong>{picked === q.a ? 'Richtig! 🎉' : 'Nicht ganz.'}</strong> {q.why}</p>
-          {tense === 'mix' && <p className="tag" style={{ '--c': t.color }}>{t.en}</p>}
+          {plain && <p className="tag" style={{ '--c': t.color }}>{t.en}</p>}
           <button className="btn primary wide" onClick={() => { setPicked(null); setI(i + 1) }}>Weiter</button>
         </div>
       )}
