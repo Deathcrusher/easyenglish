@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { loadState, saveState, resetState, dayKey, gradeCard } from './lib/storage.js'
-import { setAccent, setVoice, stopSpeaking } from './lib/speech.js'
+import { setAccent, setVoice, setNatural, stopSpeaking } from './lib/speech.js'
+import { checkSpeechService } from './lib/azure.js'
 import { checkForUpdate } from './lib/update.js'
 import Home from './components/Home.jsx'
 import Course from './components/Course.jsx'
@@ -9,20 +10,24 @@ import Grammar from './components/Grammar.jsx'
 import Speak from './components/Speak.jsx'
 import Sentences from './components/Sentences.jsx'
 import Practice, { Reading } from './components/Practice.jsx'
+import Me from './components/Me.jsx'
+import Lesson from './components/Lesson.jsx'
 
 const AppCtx = createContext(null)
 export const useApp = () => useContext(AppCtx)
 
+// Nur drei Bereiche: Lernen (Kurs), Üben (freiwillig), Ich (Fortschritt & Einstellungen)
 const TABS = [
-  { id: 'home', label: 'Start', icon: '🏠' },
-  { id: 'course', label: 'Kurs', icon: '🗺️' },
-  { id: 'vocab', label: 'Wörter', icon: '📚' },
-  { id: 'grammar', label: 'Grammatik', icon: '📖' },
+  { id: 'home', label: 'Lernen', icon: '🏠' },
   { id: 'practice', label: 'Üben', icon: '🎯' },
+  { id: 'me', label: 'Ich', icon: '👤' },
 ]
 
-// Unterbereiche von „Üben“ – in der Leiste bleibt „Üben“ markiert
-const SUB_TABS = { speak: 'practice', sentences: 'practice', reading: 'practice' }
+// Unterseiten – in der Leiste bleibt der übergeordnete Bereich markiert
+const SUB_TABS = {
+  course: 'home',
+  vocab: 'practice', grammar: 'practice', speak: 'practice', sentences: 'practice', reading: 'practice', mix: 'practice',
+}
 
 export default function App() {
   const [state, setState] = useState(loadState)
@@ -58,6 +63,10 @@ export default function App() {
   useEffect(() => saveState(state), [state])
   useEffect(() => setAccent(state.accent), [state.accent])
   useEffect(() => setVoice(state.voice), [state.voice])
+  useEffect(() => setNatural(state.voiceNatural !== false, `${state.accent === 'gb' ? 'gb' : 'us'}-${state.voiceGender || 'f'}`), [state.voiceNatural, state.voiceGender, state.accent])
+  useEffect(() => {
+    checkSpeechService()
+  }, [])
 
   const api = useMemo(
     () => ({
@@ -103,8 +112,8 @@ export default function App() {
   )
 
   const Page = {
-    home: Home, course: Course, vocab: Vocab, grammar: Grammar, practice: Practice,
-    speak: Speak, sentences: Sentences, reading: Reading,
+    home: Home, course: Course, practice: Practice, me: Me,
+    vocab: Vocab, grammar: Grammar, speak: Speak, sentences: Sentences, reading: Reading, mix: Lesson,
   }[tab]
   const activeTab = SUB_TABS[tab] || tab
 
@@ -112,7 +121,7 @@ export default function App() {
     <AppCtx.Provider value={api}>
       <div className="app">
         <main className="page" key={tab}>
-          {SUB_TABS[tab] && !route && (
+          {SUB_TABS[tab] === 'practice' && !route && tab !== 'mix' && (
             <button className="back" onClick={() => api.go('practice')}>← Üben</button>
           )}
           <Page />

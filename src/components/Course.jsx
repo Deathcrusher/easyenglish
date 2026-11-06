@@ -10,53 +10,13 @@ import { GrammarDetail, GapQuiz } from './Grammar.jsx'
 import { Reader } from './Reader.jsx'
 import { SentenceTask } from './Sentences.jsx'
 import { Listen, Progress, SayInline, shuffle } from './ui.jsx'
+import { UnitPath } from './Home.jsx'
 
+// Lektionsseiten (der Lernpfad selbst ist auf „Lernen“)
 export default function Course() {
-  const { route, setRoute, state } = useApp()
-  const cur = currentUnit(state)
-  const [level, setLevel] = useState(route?.level || cur.level)
-
+  const { route, state } = useApp()
   if (route?.unit) return <UnitRouter unit={UNIT_BY_ID[route.unit]} step={route.step} />
-
-  const stats = levelStats(state)
-  const st = stats.find((s) => s.id === level)
-
-  return (
-    <div>
-      <header className="page-head">
-        <h1>Dein Kurs</h1>
-        <p className="sub">30 Lektionen von A1 bis B1. Jede Lektion: Wörter, Grammatik, Lesen, Sätze und ein kleiner Test.</p>
-      </header>
-
-      <div className="level-tabs">
-        {stats.map((s) => (
-          <button key={s.id} className={level === s.id ? 'on' : ''} onClick={() => setLevel(s.id)} style={{ '--c': s.color }}>
-            <strong>{s.short}</strong>
-            <small>{s.done}/{s.units.length}</small>
-          </button>
-        ))}
-      </div>
-      <p className="note level-desc">{st.desc}</p>
-
-      <div className="unit-list">
-        {st.units.map((u) => {
-          const s = unitStatus(u, state)
-          const isCur = u.id === cur.id
-          return (
-            <button key={u.id} className={`unit-card ${s.complete ? 'done' : ''} ${isCur ? 'current' : ''}`} onClick={() => setRoute({ unit: u.id })} style={{ '--c': st.color }}>
-              <span className="uc-num">{s.complete ? '✓' : u.num}</span>
-              <span className="uc-text">
-                <strong>{u.icon} {u.title}</strong>
-                <small>{u.desc}</small>
-                <Progress value={s.progress * 100} max={100} color={st.color} />
-              </span>
-              {isCur && !s.complete && <span className="uc-badge">jetzt</span>}
-            </button>
-          )
-        })}
-      </div>
-    </div>
-  )
+  return <UnitPath level={currentUnit(state).level} />
 }
 
 function UnitRouter({ unit, step }) {
@@ -90,7 +50,7 @@ function UnitRouter({ unit, step }) {
 }
 
 function UnitPage({ unit }) {
-  const { state, setRoute } = useApp()
+  const { state, setRoute, go } = useApp()
   const s = unitStatus(unit, state)
   const lvl = LEVELS.find((l) => l.id === unit.level)
   const nextUnit = UNITS[unit.num] // num ist 1-basiert → nächste Lektion
@@ -98,7 +58,7 @@ function UnitPage({ unit }) {
 
   return (
     <div style={{ '--c': lvl.color }}>
-      <button className="back" onClick={() => setRoute({ level: unit.level })}>← Kurs</button>
+      <button className="back" onClick={() => go('home')}>← Lernen</button>
       <header className="unit-head">
         <span className="uh-icon">{unit.icon}</span>
         <div>

@@ -1,5 +1,5 @@
 // Einfacher Offline-Cache: Seite = erst Netz, dann Cache; Dateien = erst Cache
-const CACHE = 'easy-english-v5'
+const CACHE = 'easy-english-v6'
 
 self.addEventListener('install', () => self.skipWaiting())
 
@@ -15,8 +15,9 @@ self.addEventListener('fetch', (e) => {
   const req = e.request
   if (req.method !== 'GET') return
   const url = new URL(req.url)
-  // Versionsprüfung immer direkt vom Server, nie aus dem Cache
+  // Versionsprüfung und API immer direkt vom Server – außer Sprachausgabe (die darf offline bleiben)
   if (url.pathname === '/version.json') return
+  if (url.pathname.startsWith('/api/') && url.pathname !== '/api/tts') return
 
   if (req.mode === 'navigate') {
     e.respondWith(

@@ -1,5 +1,9 @@
+import { speechServiceStatus } from './azure.js'
+
 let voices = []
 let accent = 'us'
+let natural = { on: true, voice: 'us-f' }
+let player = null
 
 function loadVoices() {
   try {
@@ -24,6 +28,34 @@ export function setVoice(uri) {
   voiceURI = uri || ''
 }
 
+// Natürliche Stimmen (Azure) an/aus und welche Stimme (us-f, us-m, gb-f, gb-m)
+export function setNatural(on, voice) {
+  natural = { on: !!on, voice: voice || 'us-f' }
+}
+
+export function naturalActive() {
+  return natural.on && speechServiceStatus() === true && (typeof navigator === 'undefined' || navigator.onLine !== false)
+}
+
+function getPlayer() {
+  if (!player) {
+    player = new Audio()
+    player.preload = 'auto'
+    player.setAttribute('playsinline', '')
+  }
+  return player
+}
+
+export function ttsUrl(text, slow = false) {
+  return `/api/tts?v=${natural.voice}&s=${slow ? 1 : 0}&t=${encodeURIComponent(text.trim())}`
+}
+
+// Audio schon mal laden, damit es beim Antippen sofort spielt
+export function prefetch(text) {
+  if (!naturalActive() || !text) return
+  fetch(ttsUrl(text)).catch(() => {})
+}
+
 export function englishVoices() {
   if (!voices.length) loadVoices()
   return voices.filter((v) => v.lang?.replace('_', '-').startsWith('en'))
@@ -46,6 +78,27 @@ function pickVoice() {
 export const canSpeak = () => typeof window !== 'undefined' && 'speechSynthesis' in window
 
 export function speak(text, { slow = false } = {}) {
+  stopSpeaking()
+  if (naturalActive()) {
+    const p = getPlayer()
+    let fellBack = false
+    const fallback = () => {
+      if (fellBack) return
+      fellBack = true
+      speakDevice(text, slow)
+    }
+    p.onerror = fallback
+    p.onended = null
+    p.src = ttsUrl(text, slow)
+    p.play().catch((e) => {
+      if (e?.name !== 'AbortError') fallback()
+    })
+    return
+  }
+  speakDevice(text, slow)
+}
+
+function speakDevice(text, slow) {
   if (!canSpeak()) return
   const s = window.speechSynthesis
   s.cancel()
@@ -62,12 +115,52 @@ export function speak(text, { slow = false } = {}) {
 }
 
 // Mehrere Sätze nacheinander vorlesen. Gibt eine Stopp-Funktion zurück.
-export function speakSequence(texts, { slow = false, onIndex, onEnd } = {}) {
+export function speakSequence(texts, opts = {}) {
+  stopSpeaking()
+  if (!naturalActive()) return deviceSequence(texts, opts, 0)
+  const { slow = false, onIndex, onEnd } = opts
+  const p = getPlayer()
+  let stopped = false
+  let i = 0
+  let deviceStop = null
+  const next = () => {
+    if (stopped) return
+    if (i >= texts.length) {
+      onEnd?.()
+      return
+    }
+    onIndex?.(i)
+    p.onended = () => {
+      i++
+      setTimeout(next, 250)
+    }
+    p.onerror = () => {
+      // Netz weg? Rest mit der Handy-Stimme vorlesen
+      if (stopped || deviceStop) return
+      deviceStop = deviceSequence(texts, opts, i)
+    }
+    p.src = ttsUrl(texts[i], slow)
+    p.play().catch((e) => {
+      if (e?.name !== 'AbortError') p.onerror?.()
+    })
+  }
+  next()
+  return () => {
+    stopped = true
+    p.onended = null
+    p.onerror = null
+    try { p.pause() } catch { /* ignore */ }
+    deviceStop?.()
+    onEnd?.()
+  }
+}
+
+function deviceSequence(texts, { slow = false, onIndex, onEnd } = {}, start = 0) {
   if (!canSpeak()) return () => {}
   const s = window.speechSynthesis
   s.cancel()
   let stopped = false
-  let i = 0
+  let i = start
   const v = pickVoice()
   const next = () => {
     if (stopped) return
@@ -105,6 +198,11 @@ export function stopSpeaking() {
     window.speechSynthesis?.cancel()
   } catch {
     /* ignore */
+  }
+  if (player) {
+    player.onended = null
+    player.onerror = null
+    try { player.pause() } catch { /* ignore */ }
   }
 }
 

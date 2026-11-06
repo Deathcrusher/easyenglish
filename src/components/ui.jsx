@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { speak, canListen, listen, compareSpeech } from '../lib/speech.js'
-import { isIOS, isStandalone, canRecord, recognitionUsable } from '../lib/platform.js'
+import { isIOS, canRecord, recognitionUsable } from '../lib/platform.js'
+import { PronounceCheck, useSpeechService } from './Pronounce.jsx'
 import { useApp } from '../App.jsx'
 import { lesehilfe, plainLesehilfe } from '../lib/lesehilfe.js'
 
@@ -30,10 +31,15 @@ const IOS_HINT = 'Am iPhone braucht die Spracherkennung Siri bzw. Diktieren: Ein
 
 export function MicCheck({ target, onScore, compact = false }) {
   const app = useApp()
+  const service = useSpeechService()
   const [state, setState] = useState('idle') // idle | listening | done | error
   const [result, setResult] = useState(null)
   const [err, setErr] = useState('')
   const [recordMode, setRecordMode] = useState(() => !recognitionUsable())
+
+  // Bevorzugt: echte Aussprache-Prüfung über Azure (funktioniert überall, auch in der iPhone-App)
+  if (service) return <PronounceCheck target={target} onScore={onScore} compact={compact} />
+  if (service === null) return <div className="mic"><button className="mic-btn" disabled>🎤 …</button></div>
 
   if (recordMode) {
     if (canRecord()) return <RecordCompare target={target} onScore={onScore} compact={compact} />

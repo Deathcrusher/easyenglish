@@ -38,7 +38,7 @@ export default function Lesson() {
     addXp(5)
     count('lessons')
     update({ lessonDay: dayKey() })
-    go('home')
+    go('practice')
   }
 
   const header =
@@ -56,7 +56,7 @@ export default function Lesson() {
   if (step === -1) {
     return (
       <div>
-        <button className="back" onClick={() => go('home')}>← Start</button>
+        <button className="back" onClick={() => go('practice')}>← Üben</button>
         <header className="page-head">
           <h1>Tagesmix</h1>
           <p className="sub">Etwa 10 Minuten, passend zu Lektion {unit.num} ({unit.title}). Fünf kurze Schritte – danach hast du für heute richtig was geschafft.</p>

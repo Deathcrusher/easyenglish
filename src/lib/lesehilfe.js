@@ -186,3 +186,63 @@ function tipsFor(text, phonesAll) {
   const seen = new Set()
   return out.filter((t) => (seen.has(t.text) ? false : seen.add(t.text))).slice(0, 2)
 }
+
+// ---------- Für die Aussprache-Prüfung: einzelne Laute (Azure/SAPI) auf Deutsch ----------
+const PH_DE = {
+  aa: 'a', ae: 'ä', ah: 'a', ax: 'e', ao: 'o', aw: 'au', ay: 'ai', eh: 'e', er: 'ör', ey: 'ej',
+  ih: 'i', iy: 'ii', ow: 'ou', oy: 'eu', uh: 'u', uw: 'uu', b: 'b', ch: 'tsch', d: 'd', dh: 'dh',
+  f: 'f', g: 'g', h: 'h', hh: 'h', jh: 'dsch', k: 'k', l: 'l', m: 'm', n: 'n', ng: 'ng', p: 'p',
+  r: 'r', s: 's', sh: 'sch', t: 't', th: 'th', v: 'w', w: 'u', y: 'j', z: 's', zh: 'sch',
+}
+
+// Falls Azure die Laute in Lautschrift (IPA) liefert (z. B. britisch): auf dieselben Schlüssel abbilden
+const IPA_KEY = {
+  'ɑ': 'aa', 'a': 'aa', 'æ': 'ae', 'ʌ': 'ah', 'ə': 'ax', 'ɐ': 'ax', 'ɔ': 'ao', 'ɒ': 'ao', 'aʊ': 'aw', 'aɪ': 'ay',
+  'ɛ': 'eh', 'e': 'eh', 'ɝ': 'er', 'ɚ': 'er', 'ɜ': 'er', 'eɪ': 'ey', 'ɪ': 'ih', 'i': 'iy', 'oʊ': 'ow', 'əʊ': 'ow',
+  'o': 'ow', 'ɔɪ': 'oy', 'ʊ': 'uh', 'u': 'uw', 'tʃ': 'ch', 'ð': 'dh', 'ɡ': 'g', 'dʒ': 'jh', 'ŋ': 'ng', 'ɹ': 'r',
+  'ɾ': 't', 'ʃ': 'sh', 'θ': 'th', 'j': 'y', 'ʒ': 'zh', 'eə': 'ea', 'ɛə': 'ea', 'ɪə': 'ia', 'ʊə': 'ua',
+}
+const PH_EXTRA = { ea: 'ä', ia: 'ie', ua: 'ue' }
+
+function phonemeKey(p) {
+  const raw = String(p || '').trim()
+  const ipa = raw.replace(/[ːˑˈˌ.]/g, '')
+  if (IPA_KEY[ipa]) return IPA_KEY[ipa]
+  return raw.toLowerCase().replace(/[0-9]/g, '')
+}
+
+// Laut → deutsche Buchstaben; unbekannte Zeichen werden ausgeblendet (keine „komischen Zeichen“)
+export function phonemeDe(p) {
+  const k = phonemeKey(p)
+  return PH_DE[k] || PH_EXTRA[k] || (/^[a-z]{1,3}$/.test(k) ? k : '')
+}
+
+const PH_TIP = {
+  th: 'th: Zungenspitze zwischen die Zähne und pusten – nicht „s“ oder „f“.',
+  dh: 'dh: Zungenspitze zwischen die Zähne und dabei summen – nicht „d“.',
+  w: 'u-Laut am Anfang (englisches w): Lippen spitz und rund, dann öffnen – kein deutsches w!',
+  v: 'w-Laut (englisches v): obere Zähne auf die Unterlippe, wie im Deutschen „Wasser“.',
+  ae: 'ä: Mund weit auf, Kiefer nach unten – fast wie ein Schaf: „bäh“.',
+  er: 'ör: Zunge nach hinten biegen, nicht rollen.',
+  r: 'r: Zungenspitze nach hinten biegen, ohne zu rollen.',
+  z: 's summend sprechen, wie eine Biene.',
+  ih: 'kurzes i – locker und kurz, nicht „ii“.',
+  iy: 'langes ii – Lippen breit wie beim Lächeln.',
+  ey: 'ej wie in „hey“ – nicht wie deutsches „ei“.',
+  ow: 'ou: mit o anfangen und zu u gleiten.',
+  ah: 'kurzes, dumpfes a – Mund nur leicht offen.',
+  ax: 'schwaches, kurzes e – ganz entspannt sprechen.',
+  aa: 'offenes a – Mund weit auf.',
+  l: 'l am Wortende: Zunge oben lassen, „dunkel“ sprechen.',
+  ng: 'ng: hinten im Hals, kein g hinterher.',
+  d: 'd am Ende weich lassen – nicht zu t machen.',
+  b: 'b am Ende weich lassen – nicht zu p machen.',
+  g: 'g am Ende weich lassen – nicht zu k machen.',
+  zh: 'weiches sch wie in „Garage“.',
+  uw: 'langes uu – Lippen rund.',
+  uh: 'kurzes u – locker.',
+}
+
+export function phonemeTip(p) {
+  return PH_TIP[phonemeKey(p)] || 'Hör dir das Wort langsam an 🐢 und sprich es Silbe für Silbe nach.'
+}
