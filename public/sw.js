@@ -1,5 +1,5 @@
 // Einfacher Offline-Cache: Seite = erst Netz, dann Cache; Dateien = erst Cache
-const CACHE = 'easy-english-v4'
+const CACHE = 'easy-english-v5'
 
 self.addEventListener('install', () => self.skipWaiting())
 
@@ -15,6 +15,8 @@ self.addEventListener('fetch', (e) => {
   const req = e.request
   if (req.method !== 'GET') return
   const url = new URL(req.url)
+  // Versionsprüfung immer direkt vom Server, nie aus dem Cache
+  if (url.pathname === '/version.json') return
 
   if (req.mode === 'navigate') {
     e.respondWith(

@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { loadState, saveState, resetState, dayKey, gradeCard } from './lib/storage.js'
 import { setAccent, setVoice, stopSpeaking } from './lib/speech.js'
+import { checkForUpdate } from './lib/update.js'
 import Home from './components/Home.jsx'
 import Course from './components/Course.jsx'
 import Vocab from './components/Vocab.jsx'
@@ -28,6 +29,31 @@ export default function App() {
   const [tab, setTab] = useState('home')
   const [route, setRoute] = useState(null) // Unterseite innerhalb eines Tabs
   const [toast, setToast] = useState(null)
+  const [updateReady, setUpdateReady] = useState(false)
+  const where = useRef({ tab: 'home', route: null })
+  where.current = { tab, route }
+
+  // Neue Version? Beim Öffnen, beim Zurückkehren in die App und alle 30 Minuten prüfen.
+  // Auf der Startseite wird sofort neu geladen, mitten in einer Übung nur ein Hinweis gezeigt.
+  useEffect(() => {
+    let alive = true
+    const run = async () => {
+      if (!(await checkForUpdate()) || !alive) return
+      const { tab: t, route: r } = where.current
+      if (t === 'home' && !r) window.location.reload()
+      else setUpdateReady(true)
+    }
+    const onVisible = () => document.visibilityState === 'visible' && run()
+    const first = setTimeout(run, 4000)
+    const every = setInterval(run, 30 * 60 * 1000)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      alive = false
+      clearTimeout(first)
+      clearInterval(every)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [])
 
   useEffect(() => saveState(state), [state])
   useEffect(() => setAccent(state.accent), [state.accent])
@@ -92,6 +118,12 @@ export default function App() {
           <Page />
         </main>
         {toast && <div className="toast">{toast}</div>}
+        {updateReady && (
+          <div className="update-bar">
+            <span>✨ Neue Version ist da</span>
+            <button className="btn primary" onClick={() => window.location.reload()}>Aktualisieren</button>
+          </div>
+        )}
         <nav className="tabbar">
           {TABS.map((t) => (
             <button key={t.id} className={activeTab === t.id ? 'active' : ''} onClick={() => api.go(t.id)}>

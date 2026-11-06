@@ -3,6 +3,7 @@ import { useApp } from '../App.jsx'
 import { ALL_WORDS } from '../data/vocab.js'
 import { LEVELS } from '../data/units.js'
 import { currentUnit, unitStatus, levelStats } from '../lib/progress.js'
+import { isIOS, isStandalone } from '../lib/platform.js'
 import { PHRASES } from '../data/speaking.js'
 import { dayKey, addDays, isDue, streakOf, LEARNED_BOX } from '../lib/storage.js'
 import { speak, englishVoices } from '../lib/speech.js'
@@ -53,6 +54,8 @@ export default function Home() {
       </header>
 
       {settings && <Settings state={state} update={update} reset={reset} replace={replace} close={() => setSettings(false)} />}
+
+      <InstallHint state={state} update={update} openSettings={() => setSettings(true)} />
 
       <section className="card goal-card">
         <svg viewBox="0 0 120 120" className="ring">
@@ -195,6 +198,59 @@ function Achievements({ state, showAll, setShowAll }) {
   )
 }
 
+function InstallHint({ state, update, openSettings }) {
+  const [prompt, setPrompt] = useState(() => (typeof window !== 'undefined' ? window.__installPrompt : null))
+  useEffect(() => {
+    const on = () => setPrompt(window.__installPrompt)
+    window.addEventListener('installready', on)
+    return () => window.removeEventListener('installready', on)
+  }, [])
+  if (isStandalone() || state.hideInstallHint) return null
+  const ios = isIOS()
+  if (!ios && !prompt) return null
+  const hasProgress = Object.keys(state.cards).length > 0 || Object.keys(state.days).length > 0
+  const hide = () => update({ hideInstallHint: true })
+
+  return (
+    <section className="card install-card">
+      <h3>📲 Als App aufs Handy holen</h3>
+      {ios ? (
+        <>
+          <ol className="install-steps">
+            <li>Auf <b>Teilen</b> <span className="share-icon">⬆</span> tippen (Safari: unten, Chrome: oben rechts)</li>
+            <li><b>„Zum Home-Bildschirm“</b> wählen</li>
+            <li><b>„Hinzufügen“</b> – fertig! Easy English startet dann wie eine echte App.</li>
+          </ol>
+          {hasProgress && (
+            <p className="note warn">
+              Wichtig: Die App am Home-Bildschirm hat ihren eigenen Speicher. Sichere vorher deinen Fortschritt
+              (<button className="link inline" onClick={openSettings}>⚙️ → Sichern</button>) und stelle ihn in der App wieder her.
+            </p>
+          )}
+        </>
+      ) : (
+        <p className="note" style={{ marginTop: 0 }}>Mit eigenem Icon, ohne Browserleiste und auch offline nutzbar.</p>
+      )}
+      <div className="btn-row">
+        {!ios && prompt && (
+          <button
+            className="btn primary"
+            onClick={async () => {
+              prompt.prompt()
+              await prompt.userChoice.catch(() => {})
+              window.__installPrompt = null
+              setPrompt(null)
+            }}
+          >
+            App installieren
+          </button>
+        )}
+        <button className="btn ghost" onClick={hide}>{ios ? 'Erledigt / Später' : 'Später'}</button>
+      </div>
+    </section>
+  )
+}
+
 function VoicePicker({ state, update }) {
   const [voices, setVoices] = useState(() => englishVoices())
   useEffect(() => {
@@ -234,11 +290,23 @@ function Settings({ state, update, reset, replace, close }) {
   const [confirm, setConfirm] = useState(false)
   const [msg, setMsg] = useState('')
 
-  function exportData() {
-    const blob = new Blob([JSON.stringify({ app: 'easy-english', v: 1, state }, null, 1)], { type: 'application/json' })
+  async function exportData() {
+    const name = `easy-english-backup-${dayKey()}.json`
+    const json = JSON.stringify({ app: 'easy-english', v: 1, state }, null, 1)
+    // Am Handy übers Teilen-Menü („In Dateien sichern“), sonst als Download
+    try {
+      const file = new File([json], name, { type: 'application/json' })
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Easy English Backup' })
+        setMsg('✅ Backup gespeichert.')
+        return
+      }
+    } catch (err) {
+      if (err?.name === 'AbortError') return
+    }
     const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `easy-english-backup-${dayKey()}.json`
+    a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }))
+    a.download = name
     a.click()
     setTimeout(() => URL.revokeObjectURL(a.href), 1000)
     setMsg('✅ Backup-Datei heruntergeladen.')

@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { speak, canListen, listen, compareSpeech } from '../lib/speech.js'
+import { isIOS, isStandalone, canRecord, recognitionUsable } from '../lib/platform.js'
 import { useApp } from '../App.jsx'
 import { lesehilfe, plainLesehilfe } from '../lib/lesehilfe.js'
 
@@ -18,20 +19,24 @@ export function Listen({ text, small = false, label }) {
 
 const ERRORS = {
   'not-allowed': 'Mikrofon ist blockiert. Bitte im Browser das Mikrofon erlauben.',
-  'service-not-allowed': 'Mikrofon ist blockiert. Bitte im Browser das Mikrofon erlauben.',
+  'service-not-allowed': 'Spracherkennung ist blockiert. Bitte im Browser das Mikrofon erlauben.',
   'no-speech': 'Ich habe nichts gehört. Nochmal probieren – etwas lauter!',
   'audio-capture': 'Kein Mikrofon gefunden.',
   network: 'Spracherkennung braucht Internet. Bitte Verbindung prüfen.',
-  unsupported: 'Dieser Browser kann keine Sprache erkennen. Am besten Chrome oder Safari verwenden.',
+  unsupported: 'Dieser Browser kann keine Sprache erkennen.',
 }
+
+const IOS_HINT = 'Am iPhone braucht die Spracherkennung Siri bzw. Diktieren: Einstellungen → Allgemein → Tastatur → „Diktierfunktion“ einschalten.'
 
 export function MicCheck({ target, onScore, compact = false }) {
   const app = useApp()
   const [state, setState] = useState('idle') // idle | listening | done | error
   const [result, setResult] = useState(null)
   const [err, setErr] = useState('')
+  const [recordMode, setRecordMode] = useState(() => !recognitionUsable())
 
-  if (!canListen()) {
+  if (recordMode) {
+    if (canRecord()) return <RecordCompare target={target} onScore={onScore} compact={compact} />
     return <p className="note">🎤 Nachsprechen geht in Chrome (Android/PC) und Safari (iPhone).</p>
   }
 
@@ -46,7 +51,8 @@ export function MicCheck({ target, onScore, compact = false }) {
       if (r.score >= 0.65) app?.count('spoken')
       onScore?.(r.score)
     } catch (e) {
-      setErr(ERRORS[e] || 'Das hat nicht geklappt. Nochmal probieren!')
+      const blocked = e === 'not-allowed' || e === 'service-not-allowed'
+      setErr(blocked && isIOS() ? IOS_HINT : ERRORS[e] || 'Das hat nicht geklappt. Nochmal probieren!')
       setState('error')
     }
   }
@@ -60,7 +66,14 @@ export function MicCheck({ target, onScore, compact = false }) {
       <button className={`mic-btn ${state === 'listening' ? 'on' : ''}`} onClick={go} disabled={state === 'listening'}>
         {state === 'listening' ? '🎙️ Ich höre zu …' : '🎤 Nachsprechen'}
       </button>
-      {state === 'error' && <p className="note warn">{err}</p>}
+      {state === 'error' && (
+        <>
+          <p className="note warn">{err}</p>
+          {canRecord() && (
+            <button className="link" onClick={() => setRecordMode(true)}>Stattdessen aufnehmen & selbst vergleichen</button>
+          )}
+        </>
+      )}
       {state === 'done' && result && (
         <div className={`mic-result ${verdict[1]}`}>
           <div className="mic-words">
@@ -70,6 +83,108 @@ export function MicCheck({ target, onScore, compact = false }) {
           </div>
           <p className="mic-verdict">{verdict[0]}</p>
           <p className="mic-heard">Verstanden: „{result.heard}“</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Ersatz, wo es keine Spracherkennung gibt (z. B. installierte App am iPhone):
+// eigene Stimme aufnehmen, anhören und mit dem Original vergleichen
+function RecordCompare({ target, onScore, compact }) {
+  const app = useApp()
+  const [status, setStatus] = useState('idle') // idle | rec | done | error
+  const [url, setUrl] = useState(null)
+  const [rated, setRated] = useState(null)
+  const recRef = useRef(null)
+  const chunks = useRef([])
+  const timer = useRef(null)
+  const audioRef = useRef(null)
+
+  useEffect(
+    () => () => {
+      clearTimeout(timer.current)
+      try {
+        if (recRef.current?.state === 'recording') recRef.current.stop()
+      } catch {
+        /* ignore */
+      }
+    },
+    []
+  )
+  useEffect(() => () => url && URL.revokeObjectURL(url), [url])
+
+  async function start() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mime = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'].find((m) => window.MediaRecorder.isTypeSupported?.(m))
+      const rec = new window.MediaRecorder(stream, mime ? { mimeType: mime } : undefined)
+      chunks.current = []
+      rec.ondataavailable = (e) => e.data && e.data.size && chunks.current.push(e.data)
+      rec.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop())
+        const blob = new Blob(chunks.current, { type: rec.mimeType || mime || 'audio/mp4' })
+        setUrl(URL.createObjectURL(blob))
+        setStatus('done')
+      }
+      recRef.current = rec
+      rec.start()
+      setRated(null)
+      setStatus('rec')
+      timer.current = setTimeout(stop, 8000)
+    } catch {
+      setStatus('error')
+    }
+  }
+
+  function stop() {
+    clearTimeout(timer.current)
+    if (recRef.current?.state === 'recording') recRef.current.stop()
+  }
+
+  function playMine() {
+    const a = audioRef.current
+    if (!a) return
+    a.currentTime = 0
+    a.play().catch(() => {})
+  }
+
+  function rate(good) {
+    if (rated !== null) return
+    setRated(good)
+    if (good) app?.count('spoken')
+    onScore?.(good ? 0.8 : 0.3)
+  }
+
+  return (
+    <div className={`mic rec ${compact ? 'compact' : ''}`}>
+      {status !== 'rec' ? (
+        <button className="mic-btn" onClick={start}>{status === 'done' ? '🔁 Nochmal aufnehmen' : '🎙️ Aufnehmen & vergleichen'}</button>
+      ) : (
+        <button className="mic-btn on" onClick={stop}>⏹ Stopp – ich nehme auf …</button>
+      )}
+      {status === 'idle' && !compact && (
+        <p className="note center">Sprich nach, hör dir dann deine Aufnahme an und vergleiche sie mit dem Original.</p>
+      )}
+      {status === 'error' && (
+        <p className="note warn">Kein Zugriff aufs Mikrofon. Bitte beim Nachfragen „Erlauben“ tippen – oder in den Einstellungen das Mikrofon freigeben.</p>
+      )}
+      {status === 'done' && url && (
+        <div className="rec-result">
+          <audio ref={audioRef} src={url} playsInline preload="auto" />
+          <div className="rec-row">
+            <button className="btn ghost" onClick={playMine}>▶ Meine Aufnahme</button>
+            <button className="btn ghost" onClick={() => speak(target)}>🔊 Original</button>
+          </div>
+          {rated === null ? (
+            <div className="rec-rate">
+              <span>Wie klang es?</span>
+              <button className="btn ghost" onClick={() => rate(true)}>👍 Fast gleich</button>
+              <button className="btn ghost" onClick={() => rate(false)}>💪 Noch üben</button>
+            </div>
+          ) : (
+            <p className="note center">{rated ? 'Super! 🎉 Weiter so.' : 'Kein Problem – hör dir das Original langsam an 🐢 und probier es nochmal.'}</p>
+          )}
         </div>
       )}
     </div>
