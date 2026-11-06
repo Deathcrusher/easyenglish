@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { loadState, saveState, resetState, dayKey, gradeCard } from './lib/storage.js'
-import { setAccent } from './lib/speech.js'
+import { setAccent, setVoice } from './lib/speech.js'
 import Home from './components/Home.jsx'
 import Vocab from './components/Vocab.jsx'
 import Grammar from './components/Grammar.jsx'
@@ -26,6 +26,7 @@ export default function App() {
 
   useEffect(() => saveState(state), [state])
   useEffect(() => setAccent(state.accent), [state.accent])
+  useEffect(() => setVoice(state.voice), [state.voice])
 
   const api = useMemo(
     () => ({

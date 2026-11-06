@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { speak, canListen, listen, compareSpeech } from '../lib/speech.js'
 import { useApp } from '../App.jsx'
+import { lesehilfe, plainLesehilfe } from '../lib/lesehilfe.js'
 
 export function Listen({ text, small = false, label }) {
   return (
@@ -180,4 +181,63 @@ export function shuffle(arr) {
     ;[a[i], a[j]] = [a[j], a[i]]
   }
   return a
+}
+
+// ---------- Aussprache-Anzeige: deutsche Lesehilfe ----------
+export function Say({ text, size = 'big', tips = true, listen = true }) {
+  const app = useApp()
+  const r = lesehilfe(text)
+  const showIpa = app?.state?.showIpa
+  return (
+    <div className={`say say-${size}`}>
+      {r ? (
+        <div className="say-line" aria-label={`Aussprache: ${plainLesehilfe(text)}`}>
+          {size === 'big' && <span className="say-label">So klingt's</span>}
+          <span className="say-words">
+            {r.words.map((w, wi) => (
+              <span key={wi} className="say-word">
+                {w.syllables.map((s, si) => (
+                  <span key={si}>
+                    {si > 0 && <span className="say-dot">·</span>}
+                    <span className={s.stress ? 'say-stress' : ''}>{s.text}</span>
+                  </span>
+                ))}
+              </span>
+            ))}
+          </span>
+          {showIpa && <span className="say-ipa">/{r.words.map((w) => w.ipa).join(' ')}/</span>}
+        </div>
+      ) : null}
+      {listen && <Listen text={text} small={size !== 'big'} />}
+      {tips && r && r.tips.length > 0 && (
+        <div className="say-tips">
+          {r.tips.map((t) => (
+            <span key={t.text} className="say-tip">
+              <b>{t.key}</b> {t.text}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Kurze Inline-Version für Listen
+export function SayInline({ text }) {
+  const r = lesehilfe(text)
+  if (!r) return null
+  return (
+    <span className="say-inline">
+      {r.words.map((w, wi) => (
+        <span key={wi} className="say-word">
+          {w.syllables.map((s, si) => (
+            <span key={si}>
+              {si > 0 && '·'}
+              <span className={s.stress ? 'say-stress' : ''}>{s.text}</span>
+            </span>
+          ))}
+        </span>
+      ))}
+    </span>
+  )
 }

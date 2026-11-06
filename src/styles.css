@@ -386,3 +386,27 @@ p { margin: 0; }
 .link.muted { color: var(--muted); font-size: 14px; }
 .mic-words.left { justify-content: flex-start; margin: 8px 0; }
 .file-btn { display: flex; align-items: center; justify-content: center; cursor: pointer; }
+
+/* ---------- Aussprache v3 ---------- */
+.say { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 10px; }
+.say-line { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.say-label { font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.say-words { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; font-size: 26px; font-weight: 800; color: var(--text); letter-spacing: 0.01em; }
+.say-small .say-words { font-size: 18px; }
+.say-word { white-space: nowrap; }
+.say-dot { color: var(--line-strong); margin: 0 2px; font-weight: 400; }
+.say-stress { color: var(--accent); font-weight: 900; text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 5px; text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.say-ipa { font-size: 14px; color: var(--muted); margin-top: 2px; }
+.say-tips { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.say-tip { background: var(--primary-soft); border-radius: 12px; padding: 8px 12px; font-size: 14px; text-align: left; line-height: 1.35; }
+.say-tip b { display: inline-block; min-width: 26px; color: var(--primary); font-weight: 900; margin-right: 4px; }
+.say-inline { color: var(--muted); font-size: 14px; font-weight: 700; }
+.say-inline .say-word + .say-word { margin-left: 6px; }
+.say-inline .say-stress { color: var(--accent); text-decoration: none; }
+.legend { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.legend-row { display: flex; align-items: center; gap: 12px; background: var(--surface-2); border-radius: 12px; padding: 9px 12px; text-align: left; }
+.legend-sym { min-width: 74px; font-weight: 900; color: var(--accent); font-size: 17px; }
+.legend-text { flex: 1; display: flex; flex-direction: column; }
+.legend-text small { color: var(--muted); font-size: 13px; }
+.field select { background: var(--surface-2); border: 1.5px solid var(--line); border-radius: 12px; padding: 10px 12px; font: inherit; color: inherit; width: 100%; }
+.toggle.plain { box-shadow: none; background: var(--surface-2); }

@@ -4,6 +4,8 @@ const DEFAULTS = {
   name: 'Connie',
   goal: 30,
   accent: 'us',
+  voice: '', // gewählte Stimme (voiceURI)
+  showIpa: false, // internationale Lautschrift zusätzlich anzeigen
   newPerSession: 8,
   cards: {}, // id -> { box, due }
   days: {}, // 'YYYY-MM-DD' -> xp

@@ -3,7 +3,7 @@ import { useApp } from '../App.jsx'
 import { TOPICS, ALL_WORDS } from '../data/vocab.js'
 import { isDue, LEARNED_BOX } from '../lib/storage.js'
 import { speak } from '../lib/speech.js'
-import { Listen, MicCheck, Progress, shuffle } from './ui.jsx'
+import { Listen, MicCheck, Progress, Say, SayInline, shuffle } from './ui.jsx'
 
 function topicWords(topic) {
   return topic === 'all' ? ALL_WORDS : TOPICS.find((t) => t.id === topic).words
@@ -85,7 +85,7 @@ function TopicDetail({ topic }) {
             <li key={w.id}>
               <div className="wl-main">
                 <strong>{w.en}</strong>
-                <span className="ipa">/{w.ipa}/</span>
+                <SayInline text={w.en} />
                 <span className="wl-de">{w.de}</span>
               </div>
               <span className={`dot box${box === undefined ? 'new' : Math.min(box, 4)}`} title="Lernstand" />
@@ -167,9 +167,7 @@ export function Flashcards({ topic, onFinish, max }) {
       <div className={`flashcard ${flipped ? 'flipped' : ''}`}>
         {isNew && <span className="badge">neu</span>}
         <div className="fc-word">{w.en}</div>
-        <div className="ipa big">/{w.ipa}/</div>
-        <div className="hint">🗣️ sprich: <strong>{w.hint}</strong></div>
-        <Listen text={w.en} />
+        <Say text={w.en} />
 
         {flipped ? (
           <div className="fc-back">
@@ -262,7 +260,12 @@ function WordQuiz({ topic, listenMode }) {
             <p className="quiz-ask">Was hörst du? Was bedeutet das?</p>
             <button className="play-big" onClick={() => speak(q.w.en)}>🔊</button>
             <button className="link" onClick={() => speak(q.w.en, { slow: true })}>🐢 langsamer</button>
-            {picked && <div className="fc-word small">{q.w.en} <span className="ipa">/{q.w.ipa}/</span></div>}
+            {picked && (
+              <>
+                <div className="fc-word small">{q.w.en}</div>
+                <Say text={q.w.en} size="small" listen={false} tips={false} />
+              </>
+            )}
           </>
         ) : (
           <>
@@ -405,8 +408,9 @@ function WriteQuiz({ topic }) {
           <div className={`feedback ${result === 'wrong' ? 'bad' : 'good'}`}>
             <p>
               <strong>{result === 'right' ? 'Perfekt! 🎉' : result === 'typo' ? 'Fast – kleiner Tippfehler! 👍' : 'Leider nicht.'}</strong>{' '}
-              Richtig: <b>{w.en}</b> <span className="ipa">/{w.ipa}/</span>
+              Richtig: <b>{w.en}</b>
             </p>
+            <Say text={w.en} size="small" tips={false} />
             <p className="ex-en">{w.ex}</p>
             <button type="submit" className="btn primary wide">Weiter</button>
           </div>

@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useApp } from '../App.jsx'
 import { ALL_WORDS } from '../data/vocab.js'
 import { TENSES } from '../data/grammar.js'
 import { PHRASES } from '../data/speaking.js'
 import { dayKey, addDays, isDue, streakOf, LEARNED_BOX } from '../lib/storage.js'
-import { speak } from '../lib/speech.js'
+import { speak, englishVoices } from '../lib/speech.js'
 import { achievements } from '../data/achievements.js'
 import Lesson, { dayIndex } from './Lesson.jsx'
 
@@ -162,6 +162,41 @@ function Achievements({ state, showAll, setShowAll }) {
   )
 }
 
+function VoicePicker({ state, update }) {
+  const [voices, setVoices] = useState(() => englishVoices())
+  useEffect(() => {
+    const load = () => setVoices(englishVoices())
+    load()
+    const t = setTimeout(load, 600)
+    window.speechSynthesis?.addEventListener?.('voiceschanged', load)
+    return () => {
+      clearTimeout(t)
+      window.speechSynthesis?.removeEventListener?.('voiceschanged', load)
+    }
+  }, [])
+  if (!voices.length) return null
+  return (
+    <label className="field">
+      <span>Stimme</span>
+      <select
+        value={state.voice}
+        onChange={(e) => {
+          update({ voice: e.target.value })
+          setTimeout(() => speak('Hello! Nice to meet you.'), 60)
+        }}
+      >
+        <option value="">Automatisch (beste Stimme)</option>
+        {voices.map((v) => (
+          <option key={v.voiceURI} value={v.voiceURI}>
+            {v.name} ({v.lang})
+          </option>
+        ))}
+      </select>
+      <small className="note" style={{ marginTop: 2 }}>Klingt die Stimme komisch? Probier eine andere – am Handy gibt es oft mehrere.</small>
+    </label>
+  )
+}
+
 function Settings({ state, update, reset, replace, close }) {
   const [confirm, setConfirm] = useState(false)
   const [msg, setMsg] = useState('')
@@ -219,6 +254,11 @@ function Settings({ state, update, reset, replace, close }) {
           ))}
         </div>
       </div>
+      <VoicePicker state={state} update={update} />
+      <label className="toggle plain">
+        <input type="checkbox" checked={!!state.showIpa} onChange={(e) => update({ showIpa: e.target.checked })} />
+        <span>Zusätzlich internationale Lautschrift (IPA) anzeigen</span>
+      </label>
       <div className="field">
         <span>Neue Wörter pro Runde</span>
         <div className="seg">

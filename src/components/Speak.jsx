@@ -36,40 +36,14 @@ export default function Speak() {
             <span className="si-icon">{s.icon}</span>
             <span className="si-text">
               <strong>{s.title}</strong>
-              <small>/{s.ipa}/</small>
+              <small>{s.pairs.slice(0, 2).map((p) => p.join(' / ')).join(' · ')}</small>
             </span>
             <span className="arrow">→</span>
           </button>
         ))}
       </div>
 
-      <section className="card">
-        <h3>So liest du die Lautschrift</h3>
-        <p className="note">Die Zeichen zwischen /…/ zeigen, wie ein Wort klingt. Die wichtigsten:</p>
-        <div className="ipa-table">
-          {[
-            ['θ', 'think', 'th ohne Stimme'],
-            ['ð', 'the', 'th mit Stimme'],
-            ['æ', 'cat', 'offenes ä'],
-            ['ʌ', 'cup', 'kurzes a'],
-            ['ə', 'about', 'schwaches e'],
-            ['ɪ', 'sit', 'kurzes i'],
-            ['iː', 'see', 'langes i'],
-            ['ʃ', 'she', 'sch'],
-            ['tʃ', 'chair', 'tsch'],
-            ['dʒ', 'job', 'dsch'],
-            ['ŋ', 'sing', 'ng'],
-            ['w', 'water', 'u-artig'],
-            ['ˈ', 'ˈhappy', 'Betonung danach'],
-          ].map(([sym, ex, de]) => (
-            <button key={sym} className="ipa-cell" onClick={() => speak(ex.replace('ˈ', ''))}>
-              <span className="ipa-sym">{sym}</span>
-              <span>{ex}</span>
-              <small>{de}</small>
-            </button>
-          ))}
-        </div>
-      </section>
+      <LeseLegende />
     </div>
   )
 }
@@ -82,7 +56,6 @@ function SoundDetail({ id }) {
       <button className="back" onClick={() => setRoute(null)}>← Aussprache</button>
       <header className="page-head">
         <h1>{s.icon} {s.title}</h1>
-        <p className="sub">/{s.ipa}/</p>
       </header>
 
       <section className="card">
@@ -144,5 +117,43 @@ function PhrasePractice({ level }) {
         <button className="btn primary" onClick={() => { setI((i + 1) % list.length); setShowDe(false) }}>Weiter →</button>
       </div>
     </div>
+  )
+}
+
+export function LeseLegende() {
+  return (
+    <section className="card">
+      <h3>So liest du die Lesehilfe</h3>
+      <p className="note" style={{ marginTop: 0 }}>
+        Die Lesehilfe schreibt englische Wörter so, wie du sie auf Deutsch lesen würdest. Tippe auf ein Beispiel zum Anhören.
+      </p>
+      <div className="legend">
+        {[
+          ['he·LOU', 'hello', 'Die farbige Silbe wird betont, · trennt die Silben.'],
+          ['ej', 'make', '„ej“ wie in „hey“ – nicht wie deutsches „ei“!'],
+          ['ai', 'time', '„ai“ wie im deutschen „Mai“'],
+          ['ou', 'go', '„ou“: erst o, dann zu u gleiten'],
+          ['ä', 'cat', 'Mund weit auf, offenes ä'],
+          ['a', 'cup', 'kurzes, dumpfes a'],
+          ['e', 'about', 'schwaches, kurzes e (unbetont)'],
+          ['ör', 'girl', 'Zunge nach hinten biegen'],
+          ['ii / uu', 'see / food', 'doppelt = lang'],
+          ['th / dh', 'think / the', 'Zunge zwischen die Zähne (dh mit Stimme)'],
+          ['u…', 'water', 'u am Silbenanfang = englisches w (Lippen rund)'],
+          ['w', 'very', 'w wie im Deutschen = englisches v'],
+          ['dsch / tsch', 'job / chair', 'wie geschrieben'],
+          ['ß', 'stop', 'scharfes s: „ßtap“ – nicht „schtop“'],
+        ].map(([sym, ex, de]) => (
+          <button key={sym} className="legend-row" onClick={() => speak(ex.split(' / ')[0])}>
+            <span className="legend-sym">{sym}</span>
+            <span className="legend-text">
+              <strong>{ex}</strong>
+              <small>{de}</small>
+            </span>
+            <span>🔊</span>
+          </button>
+        ))}
+      </div>
+    </section>
   )
 }

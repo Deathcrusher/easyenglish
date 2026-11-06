@@ -14,14 +14,29 @@ if (typeof window !== 'undefined' && window.speechSynthesis) {
   window.speechSynthesis.onvoiceschanged = loadVoices
 }
 
+let voiceURI = ''
+
 export function setAccent(a) {
   accent = a
+}
+
+export function setVoice(uri) {
+  voiceURI = uri || ''
+}
+
+export function englishVoices() {
+  if (!voices.length) loadVoices()
+  return voices.filter((v) => v.lang?.replace('_', '-').startsWith('en'))
 }
 
 const NICE = /Google|Natural|Neural|Samantha|Daniel|Serena|Aria|Jenny|Guy|Libby|Sonia|Ava|Allison/i
 
 function pickVoice() {
   if (!voices.length) loadVoices()
+  if (voiceURI) {
+    const chosen = voices.find((v) => v.voiceURI === voiceURI)
+    if (chosen) return chosen
+  }
   const want = accent === 'gb' ? 'en-GB' : 'en-US'
   const en = voices.filter((v) => v.lang?.replace('_', '-').startsWith('en'))
   const same = en.filter((v) => v.lang.replace('_', '-') === want)
