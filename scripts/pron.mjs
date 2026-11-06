@@ -2,7 +2,8 @@
 // Aufruf: node scripts/pron.mjs
 import { writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { dictionary } from 'cmu-pronouncing-dictionary'
-import { ALL_WORDS } from '../src/data/vocab.js'
+import { ALL_WORDS } from '../src/data/units.js'
+import { READINGS } from '../src/data/readings.js'
 
 const overrides = existsSync('scripts/pron-overrides.json')
   ? JSON.parse(readFileSync('scripts/pron-overrides.json', 'utf8'))
@@ -19,6 +20,7 @@ const tokenize = (text) =>
 
 const tokens = new Set()
 for (const w of ALL_WORDS) tokenize(w.en).forEach((t) => tokens.add(t))
+for (const r of READINGS) for (const [en] of r.s) tokenize(en).forEach((t) => tokens.add(t))
 
 const out = {}
 const missing = []

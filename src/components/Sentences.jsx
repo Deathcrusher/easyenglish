@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useApp } from '../App.jsx'
 import { SENTENCES } from '../data/grammar.js'
+import { UNITS } from '../data/units.js'
+import { currentUnit } from '../lib/progress.js'
+import { sentenceItems } from '../lib/sentences.js'
 import { speak, words } from '../lib/speech.js'
 import { Listen, MicCheck, Progress, shuffle } from './ui.jsx'
 
@@ -14,8 +17,14 @@ function tokensOf(en) {
 }
 
 export default function Sentences() {
+  const { state } = useApp()
   const [mode, setMode] = useState('build')
-  const order = useMemo(() => shuffle(SENTENCES), [])
+  const order = useMemo(() => {
+    const upTo = currentUnit(state).num
+    const fromUnits = UNITS.slice(0, upTo).flatMap((u) => sentenceItems(u, 3))
+    return shuffle([...SENTENCES, ...fromUnits]).slice(0, 40)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [i, setI] = useState(0)
   const [streak, setStreak] = useState(0)
   const item = order[i % order.length]

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useApp } from '../App.jsx'
 import { ALL_WORDS } from '../data/vocab.js'
-import { TENSES } from '../data/grammar.js'
+import { LEVELS } from '../data/units.js'
+import { currentUnit, unitStatus, levelStats } from '../lib/progress.js'
 import { PHRASES } from '../data/speaking.js'
 import { dayKey, addDays, isDue, streakOf, LEARNED_BOX } from '../lib/storage.js'
 import { speak, englishVoices } from '../lib/speech.js'
@@ -16,6 +17,10 @@ export default function Home() {
   const [showAll, setShowAll] = useState(false)
   if (route?.lesson) return <Lesson />
   const lessonsToday = state.lessonDay === dayKey()
+  const cur = currentUnit(state)
+  const curStatus = unitStatus(cur, state)
+  const curLevel = LEVELS.find((l) => l.id === cur.level)
+  const levels = levelStats(state)
   const today = dayKey()
   const xp = state.days[today] || 0
   const goal = state.goal
@@ -24,7 +29,6 @@ export default function Home() {
   const due = ALL_WORDS.filter((w) => isDue(state.cards[w.id])).length
   const learned = ALL_WORDS.filter((w) => (state.cards[w.id]?.box || 0) >= LEARNED_BOX).length
   const seen = ALL_WORDS.filter((w) => state.cards[w.id]).length
-  const tense = TENSES[dayIndex() % TENSES.length]
   const phrase = PHRASES[dayIndex() % PHRASES.length]
   const hour = new Date().getHours()
   const hello = hour < 11 ? 'Good morning' : hour < 18 ? 'Hi' : 'Good evening'
@@ -85,41 +89,70 @@ export default function Home() {
         </div>
       </section>
 
-      <button className={`hero-card lesson-cta ${lessonsToday ? 'done' : ''}`} onClick={() => go('home', { lesson: true })}>
-        <div>
-          <strong>{lessonsToday ? '✅ Lektion nochmal machen' : '▶ Heutige Lektion starten'}</strong>
-          <span>Vokabeln, {tense.en}, Sätze & Sprechen – ca. 10 Min.</span>
-        </div>
-        <span className="arrow">→</span>
-      </button>
+      {!state.startLevel ? (
+        <section className="card onboarding">
+          <h3>Wo möchtest du im Kurs starten?</h3>
+          <p className="note" style={{ marginTop: 0 }}>Keine Sorge – alle Lektionen bleiben offen, du kannst jederzeit zurückspringen.</p>
+          {[
+            ['A1', '🌱', 'Ganz von vorne', 'Basics auffrischen: sich vorstellen, Zahlen, Alltag'],
+            ['A2', '🌿', 'Die Basics sitzen', 'Vergangenheit, Reisen, Arbeit, Vergleiche'],
+            ['B1', '🌳', 'Ich kann schon einiges', 'Meinung sagen, Bewerbung, if-Sätze'],
+          ].map(([id, e, t, d]) => (
+            <button key={id} className="level-pick" onClick={() => update({ startLevel: id })}>
+              <span className="lp-emoji">{e}</span>
+              <span className="lp-text">
+                <strong>{id} · {t}</strong>
+                <small>{d}</small>
+              </span>
+              <span className="arrow">→</span>
+            </button>
+          ))}
+        </section>
+      ) : (
+        <button className="continue-card" style={{ '--c': curLevel.color }} onClick={() => go('course', curStatus.next ? { unit: cur.id, step: curStatus.next.key } : { unit: cur.id })}>
+          <span className="cc-top">
+            <span className="cc-eyebrow">Weiter lernen · Lektion {cur.num} · {cur.level}</span>
+            <span className="cc-steps">{curStatus.doneCount}/5</span>
+          </span>
+          <span className="cc-title">{cur.icon} {cur.title}</span>
+          <span className="cc-next">
+            {curStatus.next ? <>Nächster Schritt: <b>{curStatus.next.title}</b></> : 'Lektion geschafft – weiter zur nächsten!'}
+          </span>
+          <span className="cc-bar"><span style={{ width: `${curStatus.progress * 100}%` }} /></span>
+        </button>
+      )}
 
-      <h2 className="section-title">Oder einzeln üben</h2>
       <div className="todo">
-        <button className="todo-item" onClick={() => go('vocab', { mode: 'cards', topic: 'all' })}>
-          <span className="todo-icon">📚</span>
+        {due > 0 && (
+          <button className="todo-item" onClick={() => go('vocab', { mode: 'cards', topic: 'all' })}>
+            <span className="todo-icon">🔁</span>
+            <span className="todo-text">
+              <strong>{due} {due === 1 ? 'Wort' : 'Wörter'} wiederholen</strong>
+              <small>Heute fällig – so bleiben sie im Kopf</small>
+            </span>
+            <span className="arrow">→</span>
+          </button>
+        )}
+        <button className="todo-item" onClick={() => go('home', { lesson: true })}>
+          <span className="todo-icon">⚡</span>
           <span className="todo-text">
-            <strong>{due > 0 ? `${due} ${due === 1 ? "Vokabel" : "Vokabeln"} wiederholen` : 'Neue Vokabeln lernen'}</strong>
-            <small>{learned} Wörter sitzen · {seen} von {ALL_WORDS.length} gesehen</small>
-          </span>
-          <span className="arrow">→</span>
-        </button>
-        <button className="todo-item" onClick={() => go('grammar', { tense: tense.id })} style={{ '--c': tense.color }}>
-          <span className="todo-icon">⏳</span>
-          <span className="todo-text">
-            <strong>Zeit des Tages: {tense.en}</strong>
-            <small>{tense.oneLiner}</small>
-          </span>
-          <span className="arrow">→</span>
-        </button>
-        <button className="todo-item" onClick={() => go('sentences')}>
-          <span className="todo-icon">🧩</span>
-          <span className="todo-text">
-            <strong>Sätze bauen</strong>
-            <small>Wortstellung üben – mit Tipps</small>
+            <strong>{lessonsToday ? 'Tagesmix nochmal' : 'Tagesmix (10 Min.)'}</strong>
+            <small>Wörter, Grammatik, Sätze & Sprechen gemischt</small>
           </span>
           <span className="arrow">→</span>
         </button>
       </div>
+
+      <div className="level-overview">
+        {levels.map((l) => (
+          <button key={l.id} className="lo-item" style={{ '--c': l.color }} onClick={() => go('course', { level: l.id })}>
+            <strong>{l.short}</strong>
+            <span className="lo-bar"><span style={{ width: `${(l.done / l.units.length) * 100}%` }} /></span>
+            <small>{l.done}/{l.units.length} Lektionen</small>
+          </button>
+        ))}
+      </div>
+      <p className="note center" style={{ marginTop: 6 }}>{learned} Wörter sitzen · {seen} von {ALL_WORDS.length} gesehen</p>
 
       <section className="card phrase-day">
         <p className="quiz-ask">Satz des Tages 🎤</p>
@@ -133,7 +166,7 @@ export default function Home() {
 
       <Achievements state={state} showAll={showAll} setShowAll={setShowAll} />
 
-      <p className="note center">So gibt's XP: Vokabel gewusst +3 · Quiz richtig +2 · Satz gebaut +3 · gut nachgesprochen +3</p>
+      <p className="note center">So gibt's XP: Wort gewusst +3 · richtige Antwort +2 · Satz gebaut +3 · Lektionstest bestanden +10</p>
     </div>
   )
 }
@@ -234,6 +267,14 @@ function Settings({ state, update, reset, replace, close }) {
         <span>Name</span>
         <input value={state.name} onChange={(e) => update({ name: e.target.value })} maxLength={20} />
       </label>
+      <div className="field">
+        <span>Startniveau im Kurs</span>
+        <div className="seg">
+          {['A1', 'A2', 'B1'].map((l) => (
+            <button key={l} className={state.startLevel === l ? 'on' : ''} onClick={() => update({ startLevel: l })}>{l}</button>
+          ))}
+        </div>
+      </div>
       <div className="field">
         <span>Tagesziel</span>
         <div className="seg">

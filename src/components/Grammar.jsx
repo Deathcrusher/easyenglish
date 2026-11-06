@@ -1,83 +1,87 @@
 import { useMemo, useState } from 'react'
 import { useApp } from '../App.jsx'
-import { TENSES, TENSE_BY_ID, GAPS, IRREGULAR } from '../data/grammar.js'
+import { IRREGULAR } from '../data/grammar.js'
+import { GRAMMAR, GRAMMAR_BY_ID, EXERCISES } from '../data/grammar-all.js'
+import { LEVELS } from '../data/units.js'
 import { speak } from '../lib/speech.js'
 import { Listen, Progress, Timeline, shuffle } from './ui.jsx'
 
 export default function Grammar() {
   const { route, setRoute, state } = useApp()
-  if (route?.tense) return <TenseDetail id={route.tense} />
-  if (route?.quiz) return <GapQuiz tense={route.quiz} />
-  if (route?.irregular) return <Irregular />
-  if (route?.compare) return <PastVsPerfect />
+  if (route?.topic) return <GrammarDetail id={route.topic} onBack={() => setRoute(null)} onPractice={() => setRoute({ quiz: route.topic })} />
+  if (route?.quiz) return <GapQuiz tense={route.quiz} onBack={() => setRoute(route.quiz === 'mix' || route.quiz === 'mistakes' ? null : { topic: route.quiz })} />
+  if (route?.irregular) return <Irregular onBack={() => setRoute(null)} />
+  if (route?.compare) return <PastVsPerfect onBack={() => setRoute(null)} />
+
+  const mistakes = Object.keys(state.gapMistakes || {}).filter((k) => k.includes(':')).length
 
   return (
     <div>
       <header className="page-head">
-        <h1>Die Zeiten</h1>
-        <p className="sub">Jede Zeit mit Zeitstrahl, Bauplan, Signalwörtern und Übungen.</p>
+        <h1>Grammatik</h1>
+        <p className="sub">30 Themen von A1 bis B1 – einfach auf Deutsch erklärt, mit Übungen.</p>
       </header>
 
-      {Object.keys(state.gapMistakes || {}).length > 0 && (
+      {mistakes > 0 && (
         <button className="hero-card" onClick={() => setRoute({ quiz: 'mistakes' })}>
           <div>
             <strong>🎯 Fehler-Training</strong>
-            <span>{Object.keys(state.gapMistakes).length} Fragen, die noch nicht sitzen</span>
+            <span>{mistakes} {mistakes === 1 ? 'Frage, die' : 'Fragen, die'} noch nicht sitzen</span>
           </div>
           <span className="arrow">→</span>
         </button>
       )}
 
-      <button className="hero-card warn" onClick={() => setRoute({ compare: true })}>
-        <div>
-          <strong>⚠️ Die größte Falle: „Ich habe … gemacht“</strong>
-          <span>Simple Past oder Present Perfect? Hier einfach erklärt.</span>
-        </div>
-        <span className="arrow">→</span>
-      </button>
-
-      <div className="tense-list">
-        {TENSES.map((t) => {
-          const best = state.tenseDone[t.id]
-          return (
-            <button key={t.id} className="tense-item" onClick={() => setRoute({ tense: t.id })} style={{ '--c': t.color }}>
-              <div className="ti-bar" />
-              <div className="ti-text">
-                <strong>{t.en}</strong>
-                <span>{t.de}</span>
-                <small>{t.oneLiner}</small>
-              </div>
-              {best !== undefined && <span className="ti-score">{best}/5</span>}
-            </button>
-          )
-        })}
-      </div>
-
       <div className="mode-row">
-        <button className="mode" onClick={() => setRoute({ quiz: 'mix' })}>
-          <span>🎲</span><strong>Mix-Quiz</strong><small>Welche Zeit passt?</small>
+        <button className="mode" onClick={() => setRoute({ compare: true })}>
+          <span>⚠️</span><strong>Die größte Falle</strong><small>„Ich habe … gemacht“</small>
         </button>
         <button className="mode" onClick={() => setRoute({ irregular: true })}>
           <span>📋</span><strong>Unregelmäßige Verben</strong><small>go – went – gone</small>
         </button>
+        <button className="mode" onClick={() => setRoute({ quiz: 'mix' })}>
+          <span>🎲</span><strong>Mix-Quiz</strong><small>10 Fragen quer durch</small>
+        </button>
       </div>
+
+      {LEVELS.map((l) => (
+        <div key={l.id}>
+          <h2 className="section-title">{l.title}</h2>
+          <div className="tense-list">
+            {GRAMMAR.filter((g) => g.level === l.id).map((g) => {
+              const best = state.tenseDone[g.id]
+              return (
+                <button key={g.id} className="tense-item" onClick={() => setRoute({ topic: g.id })} style={{ '--c': g.color }}>
+                  <div className="ti-bar" />
+                  <div className="ti-text">
+                    <strong>{g.en}</strong>
+                    <span>{g.de}</span>
+                    <small>Lektion {g.unitNum} · {g.oneLiner}</small>
+                  </div>
+                  {best !== undefined && <span className="ti-score">{best}/{g.ex.length}</span>}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
 
-function TenseDetail({ id }) {
-  const { setRoute } = useApp()
-  const t = TENSE_BY_ID[id]
+export function GrammarDetail({ id, onBack, onPractice, backLabel = '← Grammatik' }) {
+  const t = GRAMMAR_BY_ID[id]
   return (
     <div style={{ '--c': t.color }}>
-      <button className="back" onClick={() => setRoute(null)}>← Alle Zeiten</button>
+      <button className="back" onClick={onBack}>{backLabel}</button>
       <header className="page-head tense-head">
+        <p className="eyebrow">{t.level} · Lektion {t.unitNum}</p>
         <h1>{t.en}</h1>
         <p className="sub">{t.de}</p>
       </header>
 
       <section className="card">
-        <Timeline kind={t.timeline} color={t.color} />
+        {t.timeline && <Timeline kind={t.timeline} color={t.color} />}
         <p className="one-liner">{t.oneLiner}</p>
       </section>
 
@@ -89,7 +93,7 @@ function TenseDetail({ id }) {
       </section>
 
       <section className="card">
-        <h3>So baust du den Satz</h3>
+        <h3>So geht's</h3>
         <div className="forms">
           {t.forms.map((f, i) => (
             <div key={i} className="form-row">
@@ -101,12 +105,16 @@ function TenseDetail({ id }) {
         </div>
       </section>
 
-      <section className="card">
-        <h3>Signalwörter – daran erkennst du sie</h3>
-        <div className="chips">
-          {t.signals.map((s) => <button key={s} className="chip" onClick={() => speak(s)}>{s}</button>)}
-        </div>
-      </section>
+      {t.signals?.length > 0 && (
+        <section className="card">
+          <h3>{t.signalsTitle || 'Merkwörter'}</h3>
+          <div className="chips">
+            {t.signals.map((s) => (
+              <button key={s} className="chip" onClick={() => speak(s.split(' – ')[0].replace(/[…+→].*$/, '').trim() || s)}>{s}</button>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="card">
         <h3>Beispiele</h3>
@@ -128,23 +136,21 @@ function TenseDetail({ id }) {
         <p className="why">{t.mistake.why}</p>
       </section>
 
-      <button className="btn primary wide sticky-cta" onClick={() => setRoute({ quiz: id })}>
-        Jetzt üben ✏️
+      <button className="btn primary wide sticky-cta" onClick={onPractice}>
+        Jetzt üben ✏️ ({t.ex.length} Fragen)
       </button>
     </div>
   )
 }
 
-const GAP_IDS = GAPS.map((g, idx) => ({ ...g, id: idx }))
-
-export function GapQuiz({ tense, onFinish, count }) {
-  const { setRoute, addXp, update, state, markGap } = useApp()
+export function GapQuiz({ tense, onFinish, onBack, onDone, count }) {
+  const { addXp, update, state, markGap } = useApp()
   const plain = tense === 'mix' || tense === 'mistakes'
   const items = useMemo(() => {
     let pool
-    if (tense === 'mix') pool = shuffle(GAP_IDS).slice(0, 10)
-    else if (tense === 'mistakes') pool = shuffle(GAP_IDS.filter((g) => state.gapMistakes?.[g.id])).slice(0, 10)
-    else pool = shuffle(GAP_IDS.filter((g) => g.t === tense)).slice(0, count || 5)
+    if (tense === 'mix') pool = shuffle(EXERCISES).slice(0, 10)
+    else if (tense === 'mistakes') pool = shuffle(EXERCISES.filter((g) => state.gapMistakes?.[g.id])).slice(0, 10)
+    else pool = shuffle(EXERCISES.filter((g) => g.t === tense)).slice(0, count || 99)
     return pool.map((g) => ({ ...g, o: shuffle(g.o) }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tense])
@@ -152,7 +158,17 @@ export function GapQuiz({ tense, onFinish, count }) {
   const [picked, setPicked] = useState(null)
   const [score, setScore] = useState(0)
   const q = items[i]
-  const back = onFinish || (() => setRoute(plain ? null : { tense }))
+
+  if (!items.length) {
+    return (
+      <div className="center-box">
+        <div className="big-emoji">🌟</div>
+        <h2>Nichts zu üben</h2>
+        <p>Hier ist gerade alles erledigt.</p>
+        <button className="btn primary" onClick={onFinish || onBack}>Zurück</button>
+      </div>
+    )
+  }
 
   if (!q) {
     if (onFinish) {
@@ -164,19 +180,20 @@ export function GapQuiz({ tense, onFinish, count }) {
         </div>
       )
     }
+    const ratio = score / items.length
     return (
       <div className="center-box">
-        <div className="big-emoji">{score / items.length >= 0.8 ? '🏆' : score / items.length >= 0.5 ? '💪' : '🌱'}</div>
+        <div className="big-emoji">{ratio >= 0.8 ? '🏆' : ratio >= 0.5 ? '💪' : '🌱'}</div>
         <h2>{score} von {items.length} richtig</h2>
         <p>
           {tense === 'mistakes'
             ? 'Richtig beantwortete Fragen fliegen aus dem Fehler-Training raus.'
-            : score === items.length ? 'Fehlerfrei – du hast es drauf!' : 'Falsche Antworten landen im Fehler-Training. Probier es gleich nochmal!'}
+            : ratio === 1 ? 'Fehlerfrei – du hast es drauf!' : 'Falsche Antworten landen im Fehler-Training. Probier es gleich nochmal!'}
         </p>
         {tense !== 'mistakes' && (
           <button className="btn primary" onClick={() => { setI(0); setScore(0); setPicked(null) }}>Nochmal üben</button>
         )}
-        <button className="btn ghost" onClick={back}>{plain ? 'Zurück' : 'Zur Erklärung'}</button>
+        <button className="btn ghost" onClick={onBack}>{plain ? 'Zurück' : 'Zur Erklärung'}</button>
       </div>
     )
   }
@@ -193,20 +210,20 @@ export function GapQuiz({ tense, onFinish, count }) {
       addXp(2)
     }
     speak(full)
-    const isLast = i === items.length - 1
-    if (isLast && !plain && !onFinish) {
+    if (i === items.length - 1) {
       const final = score + (ok ? 1 : 0)
-      update({ tenseDone: { ...state.tenseDone, [tense]: Math.max(final, state.tenseDone[tense] || 0) } })
+      if (!plain) update({ tenseDone: { ...state.tenseDone, [tense]: Math.max(final, state.tenseDone[tense] || 0) } })
+      onDone?.(final, items.length)
     }
   }
 
-  const t = TENSE_BY_ID[q.t]
+  const t = GRAMMAR_BY_ID[q.t]
   const parts = q.q.split('___')
 
   return (
     <div>
       <div className="session-top">
-        <button className="back" onClick={back}>✕</button>
+        <button className="back" onClick={onFinish || onBack}>✕</button>
         <Progress value={i} max={items.length} />
         <span className="count">{i + 1}/{items.length}</span>
       </div>
@@ -239,16 +256,15 @@ export function GapQuiz({ tense, onFinish, count }) {
   )
 }
 
-function Irregular() {
-  const { setRoute } = useApp()
+function Irregular({ onBack }) {
   const [hide, setHide] = useState(false)
   const [shown, setShown] = useState({})
   return (
     <div>
-      <button className="back" onClick={() => setRoute(null)}>← Zeiten</button>
+      <button className="back" onClick={onBack}>← Grammatik</button>
       <header className="page-head">
         <h1>Unregelmäßige Verben</h1>
-        <p className="sub">Grundform – Simple Past – 3. Form (für Present Perfect & Past Perfect)</p>
+        <p className="sub">Grundform – Simple Past – 3. Form (für Present Perfect, Passiv & Past Perfect)</p>
       </header>
       <label className="toggle">
         <input type="checkbox" checked={hide} onChange={(e) => { setHide(e.target.checked); setShown({}) }} />
@@ -272,11 +288,11 @@ function Irregular() {
   )
 }
 
-function PastVsPerfect() {
+function PastVsPerfect({ onBack }) {
   const { setRoute } = useApp()
   return (
     <div>
-      <button className="back" onClick={() => setRoute(null)}>← Zeiten</button>
+      <button className="back" onClick={onBack}>← Grammatik</button>
       <header className="page-head">
         <h1>„Ich habe … gemacht“</h1>
         <p className="sub">Im Deutschen sagen wir fast immer „ich habe gemacht“. Im Englischen gibt es zwei Möglichkeiten.</p>

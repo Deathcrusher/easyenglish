@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useApp } from '../App.jsx'
 import { TOPICS, ALL_WORDS } from '../data/vocab.js'
+import { LEVELS } from '../data/units.js'
+import { currentUnit } from '../lib/progress.js'
 import { isDue, LEARNED_BOX } from '../lib/storage.js'
 import { speak } from '../lib/speech.js'
 import { Listen, MicCheck, Progress, Say, SayInline, shuffle } from './ui.jsx'
@@ -18,38 +20,83 @@ export default function Vocab() {
   if (route?.mode === 'pick') return <TopicDetail topic={route.topic} />
 
   const dueAll = ALL_WORDS.filter((w) => isDue(state.cards[w.id])).length
+  const learnedAll = ALL_WORDS.filter((w) => (state.cards[w.id]?.box || 0) >= LEARNED_BOX).length
   return (
     <div>
       <header className="page-head">
-        <h1>Vokabeln</h1>
-        <p className="sub">Wähle ein Thema. Wörter, die du nicht weißt, kommen öfter wieder.</p>
+        <h1>Wörter</h1>
+        <p className="sub">{ALL_WORDS.length} Wörter in 30 Lektionen · {learnedAll} sitzen schon sicher.</p>
       </header>
+
+      <WordSearch />
 
       <button className="hero-card" onClick={() => setRoute({ mode: 'cards', topic: 'all' })}>
         <div>
-          <strong>Alle Themen wiederholen</strong>
-          <span>{dueAll > 0 ? `${dueAll} Karten sind heute fällig` : 'Neue Wörter aus allen Themen lernen'}</span>
+          <strong>{dueAll > 0 ? `${dueAll} Wörter wiederholen` : 'Neue Wörter lernen'}</strong>
+          <span>{dueAll > 0 ? 'Diese Wörter sind heute fällig' : 'Aus allen Lektionen'}</span>
         </div>
         <span className="arrow">→</span>
       </button>
 
-      <div className="topic-grid">
-        {TOPICS.map((t) => {
-          const learned = t.words.filter((w) => (state.cards[w.id]?.box || 0) >= LEARNED_BOX).length
-          const started = t.words.filter((w) => state.cards[w.id]).length
-          const due = t.words.filter((w) => isDue(state.cards[w.id])).length
-          return (
-            <button key={t.id} className="topic" onClick={() => setRoute({ mode: 'pick', topic: t.id })}>
-              <span className="topic-icon">{t.icon}</span>
-              <strong>{t.title}</strong>
-              <Progress value={started + learned} max={t.words.length * 2} />
-              <small>
-                {learned}/{t.words.length} sicher{due ? ` · ${due} fällig` : ''}
-              </small>
-            </button>
-          )
-        })}
-      </div>
+      {LEVELS.map((l) => (
+        <div key={l.id}>
+          <h2 className="section-title">{l.title}</h2>
+          <div className="topic-grid">
+            {TOPICS.filter((t) => t.level === l.id).map((t) => {
+              const learned = t.words.filter((w) => (state.cards[w.id]?.box || 0) >= LEARNED_BOX).length
+              const started = t.words.filter((w) => state.cards[w.id]).length
+              const due = t.words.filter((w) => isDue(state.cards[w.id])).length
+              return (
+                <button key={t.id} className="topic" onClick={() => setRoute({ mode: 'pick', topic: t.id })}>
+                  <span className="topic-icon">{t.icon}</span>
+                  <strong>{t.title}</strong>
+                  <Progress value={started + learned} max={t.words.length * 2} color={l.color} />
+                  <small>
+                    {learned}/{t.words.length} sicher{due ? ` · ${due} fällig` : ''}
+                  </small>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function WordSearch() {
+  const [q, setQ] = useState('')
+  const results = useMemo(() => {
+    const t = q.trim().toLowerCase()
+    if (t.length < 2) return []
+    return ALL_WORDS.filter((w) => w.en.toLowerCase().includes(t) || w.de.toLowerCase().includes(t)).slice(0, 12)
+  }, [q])
+  return (
+    <div className="search">
+      <input
+        className="search-input"
+        placeholder="🔍 Wort suchen (Deutsch oder Englisch)"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        autoCapitalize="off"
+        autoCorrect="off"
+        spellCheck="false"
+      />
+      {q.trim().length >= 2 && (
+        <ul className="word-list search-results">
+          {results.length === 0 && <li className="note">Nichts gefunden.</li>}
+          {results.map((w) => (
+            <li key={w.id}>
+              <div className="wl-main">
+                <strong>{w.en}</strong>
+                <SayInline text={w.en} />
+                <span className="wl-de">{w.de}</span>
+              </div>
+              <Listen text={w.en} small />
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
@@ -59,8 +106,9 @@ function TopicDetail({ topic }) {
   const t = TOPICS.find((x) => x.id === topic)
   return (
     <div>
-      <button className="back" onClick={() => setRoute(null)}>← Themen</button>
+      <button className="back" onClick={() => setRoute(null)}>← Wörter</button>
       <header className="page-head">
+        <p className="eyebrow">Lektion {t.num} · {t.level}</p>
         <h1>{t.icon} {t.title}</h1>
       </header>
       <div className="mode-row">
@@ -105,7 +153,9 @@ export function Flashcards({ topic, onFinish, max }) {
   const initial = useMemo(() => {
     const words = topicWords(topic)
     const due = shuffle(words.filter((w) => isDue(state.cards[w.id])))
-    const fresh = words.filter((w) => !state.cards[w.id]).slice(0, state.newPerSession)
+    // Neue Wörter: bei „alle“ zuerst aus der aktuellen Lektion
+    const pool = topic === 'all' ? [...currentUnit(state).words, ...words] : words
+    const fresh = [...new Set(pool)].filter((w) => !state.cards[w.id]).slice(0, state.newPerSession)
     const all = [...due, ...fresh]
     return max ? all.slice(0, max) : all
     // eslint-disable-next-line react-hooks/exhaustive-deps

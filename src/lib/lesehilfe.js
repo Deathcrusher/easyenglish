@@ -7,7 +7,7 @@ const VOWELS = new Set(['AA', 'AE', 'AH', 'AO', 'AW', 'AY', 'EH', 'ER', 'EY', 'I
 // Konsonantengruppen, mit denen eine Silbe im Wortinneren beginnen darf
 const ONSETS = new Set([
   'P R', 'P L', 'B R', 'B L', 'T R', 'D R', 'K R', 'K L', 'G R', 'G L', 'F R', 'F L', 'TH R', 'SH R',
-  'K W', 'T W', 'D W', 'G W', 'S W', 'S M', 'S N', 'S L', 'P Y', 'B Y', 'K Y', 'F Y', 'M Y', 'HH Y', 'V Y', 'G Y',
+  'K W', 'T W', 'D W', 'G W', 'S W', 'S L', 'P Y', 'B Y', 'K Y', 'F Y', 'M Y', 'HH Y', 'V Y', 'G Y',
 ])
 
 function parse(arpa) {
@@ -59,7 +59,7 @@ function phoneToDe(p, i, all, wordStart) {
     case 'ER': return p.stress === 0 ? 'er' : 'ör'
     case 'EY': return 'ej'
     case 'IH': return 'i'
-    case 'IY': return p.stress === 0 ? 'i' : 'ii'
+    case 'IY': return p.stress === 1 ? 'ii' : 'i'
     case 'OW': return 'ou'
     case 'OY': return 'eu'
     case 'UH': return 'u'
@@ -111,7 +111,7 @@ export function lesehilfe(text) {
   const phonesAll = []
   for (const t of tokens) {
     const arpa = lookup(t)
-    if (!arpa) return null
+    if (!arpa) continue
     const phones = parse(arpa)
     phonesAll.push({ word: t, phones })
     const sylls = syllabify(phones)
@@ -123,6 +123,7 @@ export function lesehilfe(text) {
     const ipa = sylls.map((s) => (s.stress === 1 && sylls.length > 1 ? 'ˈ' : '') + s.phones.map(ipaOf).join('')).join('')
     words.push({ word: t, syllables: syl, ipa })
   }
+  if (!words.length) return null
   return { words, tips: tipsFor(text, phonesAll) }
 }
 
@@ -148,6 +149,12 @@ const SILENT = [
   [/island/, 's ist stumm'],
   [/doubt|debt/, 'b ist stumm'],
   [/\bclothes/, 'klingt fast wie „klous“'],
+  [/alm\b/, 'l ist stumm'],
+  [/mn\b/, 'n ist stumm'],
+  [/stm/, 't ist stumm'],
+  [/ften\b/, 't ist meist stumm'],
+  [/gn\b/, 'g ist stumm'],
+  [/answer/, 'w ist stumm'],
 ]
 
 const TIP_TEXT = {

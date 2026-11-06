@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useApp } from '../App.jsx'
-import { TENSES } from '../data/grammar.js'
 import { SENTENCES } from '../data/grammar.js'
+import { GRAMMAR_BY_ID } from '../data/grammar-all.js'
+import { currentUnit } from '../lib/progress.js'
+import { sentenceItems } from '../lib/sentences.js'
 import { PHRASES } from '../data/speaking.js'
 import { Flashcards } from './Vocab.jsx'
 import { GapQuiz } from './Grammar.jsx'
@@ -14,14 +16,19 @@ export function dayIndex() {
   return Math.floor((d - new Date(d.getFullYear(), 0, 0)) / 86400000)
 }
 
-const STEPS = ['Vokabeln', 'Zeit', 'Satz 1', 'Satz 2', 'Sprechen']
+const STEPS = ['Wörter', 'Grammatik', 'Satz 1', 'Satz 2', 'Sprechen']
 
 export default function Lesson() {
   const { go, addXp, count, state, update } = useApp()
   const [step, setStep] = useState(-1)
-  const tense = TENSES[dayIndex() % TENSES.length]
+  const unit = currentUnit(state)
+  const tense = GRAMMAR_BY_ID[unit.grammar]
   const phrase = PHRASES[dayIndex() % PHRASES.length]
-  const sentences = useMemo(() => shuffle(SENTENCES).slice(0, 2), [])
+  const sentences = useMemo(() => {
+    const fromUnit = sentenceItems(unit, 2)
+    return fromUnit.length === 2 ? fromUnit : shuffle(SENTENCES).slice(0, 2)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const next = () => {
     window.scrollTo({ top: 0 })
     setStep((s) => s + 1)
@@ -51,13 +58,13 @@ export default function Lesson() {
       <div>
         <button className="back" onClick={() => go('home')}>← Start</button>
         <header className="page-head">
-          <h1>Heutige Lektion</h1>
-          <p className="sub">Etwa 10 Minuten. Fünf kurze Schritte – danach hast du für heute richtig was geschafft.</p>
+          <h1>Tagesmix</h1>
+          <p className="sub">Etwa 10 Minuten, passend zu Lektion {unit.num} ({unit.title}). Fünf kurze Schritte – danach hast du für heute richtig was geschafft.</p>
         </header>
         <section className="card">
           <ol className="lesson-plan">
-            <li><span>📚</span> 6 Vokabeln lernen oder wiederholen</li>
-            <li><span>⏳</span> Zeit des Tages: <strong>{tense.en}</strong></li>
+            <li><span>📚</span> 6 Wörter lernen oder wiederholen</li>
+            <li><span>📖</span> Grammatik: <strong>{tense.en}</strong></li>
             <li><span>🧩</span> 2 Sätze bauen</li>
             <li><span>🎤</span> Einen Satz nachsprechen</li>
           </ol>
@@ -83,10 +90,10 @@ export default function Lesson() {
         {header}
         <section className="card" style={{ '--c': tense.color }}>
           <p className="quiz-ask">Kurz erinnert: {tense.en}</p>
-          <Timeline kind={tense.timeline} color={tense.color} />
+          {tense.timeline && <Timeline kind={tense.timeline} color={tense.color} />}
           <p className="one-liner">{tense.oneLiner}</p>
           <div className="chips small center">
-            {tense.signals.slice(0, 5).map((s) => <span key={s} className="chip">{s}</span>)}
+            {(tense.signals || []).slice(0, 5).map((s) => <span key={s} className="chip">{s}</span>)}
           </div>
         </section>
         <GapQuiz tense={tense.id} count={4} onFinish={next} />
@@ -122,7 +129,7 @@ export default function Lesson() {
   return (
     <div className="center-box">
       <div className="big-emoji">🏅</div>
-      <h2>Lektion geschafft!</h2>
+      <h2>Tagesmix geschafft!</h2>
       <p>Großartig! Dafür gibt's +5 Bonus-XP. Bis morgen – dranbleiben lohnt sich.</p>
       <button className="btn primary" onClick={finish}>Bonus abholen</button>
     </div>

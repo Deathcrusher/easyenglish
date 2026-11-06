@@ -1,5 +1,5 @@
 // Einfacher Offline-Cache: Seite = erst Netz, dann Cache; Dateien = erst Cache
-const CACHE = 'easy-english-v3'
+const CACHE = 'easy-english-v4'
 
 self.addEventListener('install', () => self.skipWaiting())
 

@@ -61,6 +61,53 @@ export function speak(text, { slow = false } = {}) {
   s.speak(u)
 }
 
+// Mehrere Sätze nacheinander vorlesen. Gibt eine Stopp-Funktion zurück.
+export function speakSequence(texts, { slow = false, onIndex, onEnd } = {}) {
+  if (!canSpeak()) return () => {}
+  const s = window.speechSynthesis
+  s.cancel()
+  let stopped = false
+  let i = 0
+  const v = pickVoice()
+  const next = () => {
+    if (stopped) return
+    if (i >= texts.length) {
+      onEnd?.()
+      return
+    }
+    onIndex?.(i)
+    const u = new SpeechSynthesisUtterance(texts[i])
+    if (v) {
+      u.voice = v
+      u.lang = v.lang
+    } else u.lang = accent === 'gb' ? 'en-GB' : 'en-US'
+    u.rate = slow ? 0.6 : 0.92
+    u.onend = () => {
+      i++
+      setTimeout(next, 250)
+    }
+    u.onerror = () => {
+      stopped = true
+      onEnd?.()
+    }
+    s.speak(u)
+  }
+  next()
+  return () => {
+    stopped = true
+    s.cancel()
+    onEnd?.()
+  }
+}
+
+export function stopSpeaking() {
+  try {
+    window.speechSynthesis?.cancel()
+  } catch {
+    /* ignore */
+  }
+}
+
 export const canListen = () =>
   typeof window !== 'undefined' && !!(window.SpeechRecognition || window.webkitSpeechRecognition)
 

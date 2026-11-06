@@ -1,22 +1,27 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { loadState, saveState, resetState, dayKey, gradeCard } from './lib/storage.js'
-import { setAccent, setVoice } from './lib/speech.js'
+import { setAccent, setVoice, stopSpeaking } from './lib/speech.js'
 import Home from './components/Home.jsx'
+import Course from './components/Course.jsx'
 import Vocab from './components/Vocab.jsx'
 import Grammar from './components/Grammar.jsx'
 import Speak from './components/Speak.jsx'
 import Sentences from './components/Sentences.jsx'
+import Practice, { Reading } from './components/Practice.jsx'
 
 const AppCtx = createContext(null)
 export const useApp = () => useContext(AppCtx)
 
 const TABS = [
   { id: 'home', label: 'Start', icon: '🏠' },
-  { id: 'vocab', label: 'Vokabeln', icon: '📚' },
-  { id: 'grammar', label: 'Zeiten', icon: '⏳' },
-  { id: 'speak', label: 'Sprechen', icon: '🎤' },
-  { id: 'sentences', label: 'Sätze', icon: '🧩' },
+  { id: 'course', label: 'Kurs', icon: '🗺️' },
+  { id: 'vocab', label: 'Wörter', icon: '📚' },
+  { id: 'grammar', label: 'Grammatik', icon: '📖' },
+  { id: 'practice', label: 'Üben', icon: '🎯' },
 ]
+
+// Unterbereiche von „Üben“ – in der Leiste bleibt „Üben“ markiert
+const SUB_TABS = { speak: 'practice', sentences: 'practice', reading: 'practice' }
 
 export default function App() {
   const [state, setState] = useState(loadState)
@@ -57,6 +62,7 @@ export default function App() {
       replace: (next) => setState(next),
       reset: () => setState(resetState()),
       go: (t, r = null) => {
+        stopSpeaking()
         setTab(t)
         setRoute(r)
         window.scrollTo({ top: 0 })
@@ -70,18 +76,25 @@ export default function App() {
     [state, route]
   )
 
-  const Page = { home: Home, vocab: Vocab, grammar: Grammar, speak: Speak, sentences: Sentences }[tab]
+  const Page = {
+    home: Home, course: Course, vocab: Vocab, grammar: Grammar, practice: Practice,
+    speak: Speak, sentences: Sentences, reading: Reading,
+  }[tab]
+  const activeTab = SUB_TABS[tab] || tab
 
   return (
     <AppCtx.Provider value={api}>
       <div className="app">
         <main className="page" key={tab}>
+          {SUB_TABS[tab] && !route && (
+            <button className="back" onClick={() => api.go('practice')}>← Üben</button>
+          )}
           <Page />
         </main>
         {toast && <div className="toast">{toast}</div>}
         <nav className="tabbar">
           {TABS.map((t) => (
-            <button key={t.id} className={tab === t.id ? 'active' : ''} onClick={() => api.go(t.id)}>
+            <button key={t.id} className={activeTab === t.id ? 'active' : ''} onClick={() => api.go(t.id)}>
               <span className="tab-icon">{t.icon}</span>
               <span className="tab-label">{t.label}</span>
             </button>

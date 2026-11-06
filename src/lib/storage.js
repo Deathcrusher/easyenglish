@@ -1,4 +1,8 @@
+import LEGACY from '../data/legacy-ids.json'
+import { slug } from '../data/units.js'
+
 const KEY = 'easy-english-v1'
+const VERSION = 3
 
 const DEFAULTS = {
   name: 'Connie',
@@ -12,16 +16,29 @@ const DEFAULTS = {
   tenseDone: {}, // tenseId -> best score
   gapMistakes: {}, // Index der falsch beantworteten Lückentexte
   stats: {}, // Zähler für Erfolge (sentences, spoken, dictation, lessons, written)
+  units: {}, // Fortschritt pro Lektion: { words, grammar, reading, sentences, test }
+  startLevel: null, // gewähltes Startniveau (A1/A2/B1)
 }
 
 export const STATE_KEYS = Object.keys(DEFAULTS)
 
+// Ältere Versionen: Karten-IDs auf die neuen Wort-IDs umstellen
+function migrate(s) {
+  if (s.v === VERSION) return s
+  const cards = {}
+  for (const [id, c] of Object.entries(s.cards || {})) {
+    const nid = LEGACY[id] ? slug(LEGACY[id]) : id
+    if (!cards[nid] || (cards[nid].box || 0) < (c.box || 0)) cards[nid] = c
+  }
+  return { ...s, cards, gapMistakes: {}, v: VERSION }
+}
+
 export function loadState() {
   try {
     const raw = localStorage.getItem(KEY)
-    return { ...DEFAULTS, ...(raw ? JSON.parse(raw) : {}) }
+    return migrate({ ...DEFAULTS, ...(raw ? JSON.parse(raw) : {}) })
   } catch {
-    return { ...DEFAULTS }
+    return { ...DEFAULTS, v: VERSION }
   }
 }
 
@@ -39,7 +56,7 @@ export function resetState() {
   } catch {
     /* ignore */
   }
-  return { ...DEFAULTS }
+  return { ...DEFAULTS, v: VERSION }
 }
 
 export function dayKey(date = new Date()) {
