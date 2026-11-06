@@ -150,9 +150,9 @@ export function PronounceCheck({ target, onScore, compact = false }) {
           </div>
           {open !== null && res.words[open] && <WordDetail w={res.words[open]} />}
           <div className="rec-row">
-            <button className="btn ghost" onClick={playMine}>▶ Ich</button>
-            <button className="btn ghost" onClick={() => speak(target)}>🔊 Original</button>
-            <button className="btn ghost" onClick={() => speak(target, { slow: true })}>🐢 Langsam</button>
+            <button className="btn ghost" onClick={playMine}><span>▶️</span>Ich</button>
+            <button className="btn ghost" onClick={() => speak(target)}><span>🔊</span>Original</button>
+            <button className="btn ghost" onClick={() => speak(target, { slow: true })}><span>🐢</span>Langsam</button>
           </div>
         </div>
       )}
